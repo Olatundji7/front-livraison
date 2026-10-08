@@ -1,0 +1,8 @@
+Analyzing ma_livraison_flutter...                               
+
+warning • The value of the local variable 'id' isn't used. Try removing the variable or using it • lib/screens/client/client_order_dashboard_page.dart:146:15 • unused_local_variable
+   info • Don't use 'BuildContext's across async gaps. Try rewriting the code to not use the 'BuildContext', or guard the use with a 'mounted' check • lib/screens/client/order_page.dart:413:17 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps. Try rewriting the code to not use the 'BuildContext', or guard the use with a 'mounted' check • lib/screens/client/order_page.dart:414:26 • use_build_context_synchronously
+   info • The import of 'dart:typed_data' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/foundation.dart'. Try removing the import directive • lib/services/mock_store_service.dart:1:8 • unnecessary_import
+
+4 issues found. (ran in 1.6s)

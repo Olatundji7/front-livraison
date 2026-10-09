@@ -21,10 +21,20 @@ class ApiClient {
 
   String? token;
 
-  static String resolveMediaUrl(String? value) {
-    if (value == null || value.isEmpty) return '';
-    if (value.startsWith('http://') || value.startsWith('https://')) return value;
-    return value.startsWith('/') ? '$baseUrl$value' : '$baseUrl/$value';
+  String? mediaUrl(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    final value = raw.trim();
+    if (value.startsWith('data:')) return value;
+    final parsed = Uri.tryParse(value);
+    if (parsed != null && parsed.hasScheme) {
+      final apiUri = Uri.tryParse(baseUrl);
+      if ((parsed.host == '127.0.0.1' || parsed.host == 'localhost') && apiUri != null && apiUri.host.isNotEmpty) {
+        return parsed.replace(host: apiUri.host, port: apiUri.hasPort ? apiUri.port : parsed.port).toString();
+      }
+      return value;
+    }
+    final normalized = value.startsWith('/') ? value : '/$value';
+    return '$baseUrl$normalized';
   }
 
   Future<dynamic> request(

@@ -27,13 +27,38 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> submit() async {
-    final ok = await context.read<AuthProvider>().register(
-          nom: nom.text.trim(),
-          telephone: phone.text.trim(),
-          email: email.text.trim(),
-          password: password.text,
+    final auth = context.read<AuthProvider>();
+    final ok = await auth.register(
+      nom: nom.text.trim(),
+      telephone: phone.text.trim(),
+      email: email.text.trim(),
+      password: password.text,
+    );
+
+    if (!mounted) return;
+
+    if (ok) {
+      // Clear the form once the API confirms that the account was created.
+      nom.clear();
+      phone.clear();
+      email.clear();
+      password.clear();
+      FocusScope.of(context).unfocus();
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Compte créé avec succès !'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
-    if (ok && mounted) Navigator.pushReplacementNamed(context, '/home');
+
+      // Give the user time to see the confirmation before opening the home page.
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
+      if (mounted) Navigator.pushReplacementNamed(context, '/home');
+    }
   }
 
   @override

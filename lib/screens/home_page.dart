@@ -9,12 +9,11 @@ import '../core/responsive.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/brand_logo.dart';
 import '../widgets/login_dialog.dart';
-import '../services/ma_api_service.dart';
-import '../services/api_client.dart';
 import 'auth/admin_login_page.dart';
 import 'auth/driver_login_page.dart';
 import 'auth/register_page.dart';
 import 'client/product_catalog_page.dart';
+import 'home/publicity_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -85,6 +84,7 @@ class _HomePageState extends State<HomePage> {
             _nav('Accueil', () => go(homeKey)),
             _nav('Services', () => go(servicesKey)),
             _nav('À propos', () => go(aboutKey)),
+            _nav('Publicités', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PublicityPage()))),
           ],
           if (!desktop)
             PopupMenuButton<String>(
@@ -92,6 +92,7 @@ class _HomePageState extends State<HomePage> {
                 if (value == 'home') go(homeKey);
                 if (value == 'services') go(servicesKey);
                 if (value == 'about') go(aboutKey);
+                if (value == 'publicity') Navigator.push(context, MaterialPageRoute(builder: (_) => const PublicityPage()));
                 if (value == 'admin') {
                   Navigator.push(
                     context,
@@ -105,6 +106,7 @@ class _HomePageState extends State<HomePage> {
                 PopupMenuItem(value: 'home', child: Text('Accueil')),
                 PopupMenuItem(value: 'services', child: Text('Services')),
                 PopupMenuItem(value: 'about', child: Text('À propos')),
+                PopupMenuItem(value: 'publicity', child: Text('Publicités')), 
                 PopupMenuItem(
                   value: 'admin',
                   child: Text('Administration'),
@@ -148,7 +150,6 @@ class _HomePageState extends State<HomePage> {
             Container(key: homeKey, child: _hero(context)),
             _quick(context),
             Container(key: servicesKey, child: _services(context)),
-            _advertisements(context),
             Container(key: aboutKey, child: _about()),
             _team(),
             _footer(),
@@ -348,100 +349,6 @@ class _HomePageState extends State<HomePage> {
           subtitle: Text(description),
         ),
       ),
-    );
-  }
-
-  Widget _advertisements(BuildContext context) {
-    final api = context.read<AuthProvider>().api;
-    return FutureBuilder<dynamic>(
-      future: api.request('GET', '/advertisements'),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox(
-            height: 180,
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        if (snapshot.hasError || snapshot.data is! Map) {
-          return const SizedBox.shrink();
-        }
-
-        final data = Map<String, dynamic>.from(snapshot.data as Map);
-        final items = (data['advertisements'] as List?) ?? [];
-        if (items.isEmpty) return const SizedBox.shrink();
-
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
-          child: Column(
-            children: [
-              const Text(
-                'Publicités',
-                style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 260,
-                child: PageView.builder(
-                  itemCount: items.length,
-                  itemBuilder: (_, index) {
-                    final ad = Map<String, dynamic>.from(items[index] as Map);
-                    final imageUrl = ApiClient.resolveMediaUrl(ad['image_url']?.toString());
-                    return Card(
-                      clipBehavior: Clip.antiAlias,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          if (imageUrl != null && imageUrl.isNotEmpty)
-                            Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFFEAF2FF), child: Icon(Icons.campaign_outlined, size: 64)))
-                          else
-                            const ColoredBox(
-                              color: Color(0xFFEAF2FF),
-                              child: Icon(Icons.campaign_outlined, size: 64),
-                            ),
-                          Align(
-                            alignment: Alignment.bottomCenter,
-                            child: Container(
-                              width: double.infinity,
-                              color: Colors.black54,
-                              padding: const EdgeInsets.all(14),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    (ad['title'] ?? 'Publicité').toString(),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 19,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  if (ad['description'] != null &&
-                                      ad['description']
-                                          .toString()
-                                          .trim()
-                                          .isNotEmpty)
-                                    Text(
-                                      ad['description'].toString(),
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 

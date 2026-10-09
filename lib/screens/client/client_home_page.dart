@@ -5,6 +5,7 @@ import '../../providers/auth_provider.dart';
 import 'client_order_form_page.dart';
 import 'client_order_dashboard_page.dart';
 import 'product_catalog_page.dart';
+import '../home/publicity_page.dart';
 
 class ClientHomePage extends StatelessWidget {
   const ClientHomePage({super.key, required this.clientName});
@@ -20,6 +21,7 @@ class ClientHomePage extends StatelessWidget {
       _action(context, Icons.directions_car, 'Course personnelle', 'Déposer une demande de course personnelle.', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ClientOrderFormPage(type: 'course_personnelle')))),
       _action(context, Icons.receipt_long, 'Ma commande active', 'Suivre le statut de votre commande.', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ClientOrderDashboardPage()))),
       _action(context, Icons.storefront, 'Produits disponibles', 'Consulter le catalogue.', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductCatalogPage()))),
+      _action(context, Icons.campaign_outlined, 'Publicités', 'Voir les annonces et offres de MA3H.', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PublicityPage()))),
     ]),
   );
   Widget _action(BuildContext context, IconData icon, String title, String text, VoidCallback onTap) => Card(child: ListTile(contentPadding: const EdgeInsets.all(16), leading: CircleAvatar(backgroundColor: AppColors.primaryLight, child: Icon(icon, color: AppColors.primary)), title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text(text), trailing: const Icon(Icons.chevron_right), onTap: onTap));

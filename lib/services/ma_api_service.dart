@@ -270,6 +270,72 @@ class MaApiService {
     );
   }
 
+  Future<Map<String, dynamic>> cart() async {
+    return Map<String, dynamic>.from(
+      await api.request('GET', '/cart', authenticated: true),
+    );
+  }
+
+  Future<Map<String, dynamic>> addCartItem(int productId, {int quantity = 1}) async {
+    return Map<String, dynamic>.from(await api.request(
+      'POST',
+      '/cart/items',
+      authenticated: true,
+      body: {'product_id': productId, 'quantity': quantity},
+    ));
+  }
+
+  Future<Map<String, dynamic>> updateCartItem(int itemId, int quantity) async {
+    return Map<String, dynamic>.from(await api.request(
+      'PATCH',
+      '/cart/items/$itemId',
+      authenticated: true,
+      body: {'quantity': quantity},
+    ));
+  }
+
+  Future<Map<String, dynamic>> removeCartItem(int itemId) async {
+    return Map<String, dynamic>.from(await api.request(
+      'DELETE',
+      '/cart/items/$itemId',
+      authenticated: true,
+    ));
+  }
+
+  Future<Map<String, dynamic>> clearCart() async {
+    return Map<String, dynamic>.from(await api.request(
+      'DELETE',
+      '/cart',
+      authenticated: true,
+    ));
+  }
+
+  Future<OrderModel> checkoutCart({
+    required String pickupAddress,
+    required double pickupLat,
+    required double pickupLng,
+    required String destinationAddress,
+    required double destinationLat,
+    required double destinationLng,
+    String? note,
+  }) async {
+    final data = await api.request(
+      'POST',
+      '/cart/checkout',
+      authenticated: true,
+      body: {
+        'pickup_address': pickupAddress,
+        'pickup_latitude': pickupLat,
+        'pickup_longitude': pickupLng,
+        'destination_address': destinationAddress,
+        'destination_latitude': destinationLat,
+        'destination_longitude': destinationLng,
+        'note': note,
+      },
+    );
+    return OrderModel.fromJson(Map<String, dynamic>.from(data['order'] as Map));
+  }
+
   Future<OrderModel> createOrder({
     required String type,
     required String pickupAddress,

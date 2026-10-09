@@ -1,4 +1,3 @@
-import 'dart:async';
 
 import 'dart:typed_data';
 
@@ -12,7 +11,6 @@ import '../../core/app_colors.dart';
 import '../../models/order_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/ma_api_service.dart';
-import '../../services/api_client.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -33,14 +31,12 @@ class _AdminDashboardState extends State<AdminDashboard>
   bool loading = true;
   String? error;
   String orderStatusFilter = '';
-  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 6, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadAll());
-    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) => _loadAll());
   }
 
   MaApiService _serviceForContext(BuildContext context) {
@@ -49,7 +45,6 @@ class _AdminDashboardState extends State<AdminDashboard>
 
   @override
   void dispose() {
-    _refreshTimer?.cancel();
     _tabs.dispose();
     super.dispose();
   }
@@ -432,7 +427,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                   SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Les commandes sont visibles par les livreurs disponibles. L’administration suit le traitement, peut attribuer manuellement une commande si nécessaire et supervise les itinéraires.',
+                      'Les commandes sont reçues par MA Livraison puis attribuées par l’administration à un livreur disponible.',
                     ),
                   ),
                 ],
@@ -567,9 +562,8 @@ class _AdminDashboardState extends State<AdminDashboard>
                 ),
                 title: Text('Commande #${order.id}'),
                 subtitle: Text(
-                  '${order.statut}\n${order.pickupAdresse ?? 'Départ'}'
-                  '${order.destAdresse == null ? '' : ' → ${order.destAdresse}'}'
-                  '${order.distanceTravelledKm == null ? '' : '\nDistance parcourue : ${order.distanceTravelledKm!.toStringAsFixed(2)} km'}',
+                  '${order.statut}\nPrix net course : ${order.deliveryFee ?? 0} FCFA\n${order.pickupAdresse ?? 'Départ'}'
+                  '${order.destAdresse == null ? '' : ' → ${order.destAdresse}'}',
                 ),
                 isThreeLine: true,
                 trailing: canAssign
@@ -645,7 +639,7 @@ class _AdminDashboardState extends State<AdminDashboard>
   }
 
   Widget _driverImage(Map<String, dynamic> driver) {
-    final url = ApiClient.resolveMediaUrl(driver['photo_url']?.toString());
+    final url = context.read<AuthProvider>().api.mediaUrl(driver['photo_url']?.toString());
     if (url != null && url.isNotEmpty) {
       return CircleAvatar(
         backgroundImage: NetworkImage(url),
@@ -736,14 +730,14 @@ class _AdminDashboardState extends State<AdminDashboard>
   }
 
   Widget _productImage(Map<String, dynamic> product) {
-    final url = ApiClient.resolveMediaUrl(product['image_url']?.toString());
+    final url = context.read<AuthProvider>().api.mediaUrl(product['image_url']?.toString());
     if (url != null && url.isNotEmpty) {
       return SizedBox(
         width: 60,
         height: 60,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(10),
-          child: Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFFEAF2FF), child: Icon(Icons.image_not_supported_outlined))),
+          child: Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
         ),
       );
     }
@@ -815,14 +809,14 @@ class _AdminDashboardState extends State<AdminDashboard>
   }
 
   Widget _adImage(Map<String, dynamic> ad) {
-    final url = ApiClient.resolveMediaUrl(ad['image_url']?.toString());
+    final url = context.read<AuthProvider>().api.mediaUrl(ad['image_url']?.toString());
     if (url != null && url.isNotEmpty) {
       return SizedBox(
         width: 72,
         height: 52,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFFEAF2FF), child: Icon(Icons.image_not_supported_outlined))),
+          child: Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
         ),
       );
     }
@@ -966,51 +960,37 @@ class _AdminMapTabState extends State<_AdminMapTab> {
                     ),
                   ],
                 ),
-              MarkerLayer(
-                markers: [
-                  for (final driver in widget.drivers)
-                    if (_toDouble(driver['latitude']) != null && _toDouble(driver['longitude']) != null)
-                      Marker(
-                        point: LatLng(_toDouble(driver['latitude'])!, _toDouble(driver['longitude'])!),
-                        width: 44,
-                        height: 44,
-                        child: Tooltip(
-                          message: (driver['user'] is Map ? driver['user']['name'] : 'Livreur').toString(),
-                          child: Icon(
-                            Icons.delivery_dining,
-                            color: _driverColor(driver),
-                            size: 34,
-                          ),
-                        ),
-                      ),
-                  if (points.isNotEmpty)
+              if (points.isNotEmpty)
+                MarkerLayer(
+                  markers: [
                     Marker(
                       point: points.first,
                       width: 44,
                       height: 44,
-                      child: const Icon(Icons.my_location, color: Colors.green, size: 34),
+                      child: const Icon(
+                        Icons.my_location,
+                        color: Colors.green,
+                        size: 34,
+                      ),
                     ),
-                  if (points.length > 1)
-                    Marker(
-                      point: points.last,
-                      width: 44,
-                      height: 44,
-                      child: const Icon(Icons.location_on, color: Colors.red, size: 38),
-                    ),
-                ],
-              ),
+                    if (points.length > 1)
+                      Marker(
+                        point: points.last,
+                        width: 44,
+                        height: 44,
+                        child: const Icon(
+                          Icons.location_on,
+                          color: Colors.red,
+                          size: 38,
+                        ),
+                      ),
+                  ],
+                ),
             ],
           ),
         ),
       ],
     );
-  }
-
-  Color _driverColor(Map<String, dynamic> driver) {
-    final status = (driver['status'] ?? '').toString();
-    if (status == 'occupe') return Colors.orange;
-    if (status == 'disponible') return Colors.green;
-    return Colors.grey;
   }
 
   double? _toDouble(Object? value) {
@@ -1350,6 +1330,21 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
           child: SingleChildScrollView(
             child: Column(
               children: [
+                if (imageBytes != null)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.memory(imageBytes!, height: 170, width: double.infinity, fit: BoxFit.cover),
+                  )
+                else if ((widget.product?['image_url'] ?? '').toString().isNotEmpty)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      context.read<AuthProvider>().api.mediaUrl(widget.product!['image_url'].toString())!,
+                      height: 170, width: double.infinity, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox(height: 120, child: Icon(Icons.broken_image_outlined, size: 50)),
+                    ),
+                  ),
+                const SizedBox(height: 10),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: OutlinedButton.icon(
@@ -1523,6 +1518,21 @@ class _AdvertisementFormDialogState extends State<_AdvertisementFormDialog> {
           child: SingleChildScrollView(
             child: Column(
               children: [
+                if (imageBytes != null)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.memory(imageBytes!, height: 170, width: double.infinity, fit: BoxFit.cover),
+                  )
+                else if ((widget.advertisement?['image_url'] ?? '').toString().isNotEmpty)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      context.read<AuthProvider>().api.mediaUrl(widget.advertisement!['image_url'].toString())!,
+                      height: 170, width: double.infinity, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox(height: 120, child: Icon(Icons.broken_image_outlined, size: 50)),
+                    ),
+                  ),
+                const SizedBox(height: 10),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: OutlinedButton.icon(

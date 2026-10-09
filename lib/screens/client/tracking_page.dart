@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -8,10 +6,11 @@ import 'package:provider/provider.dart';
 import '../../core/app_colors.dart';
 import '../../models/order_model.dart';
 import '../../providers/auth_provider.dart';
-import '../../services/ma_api_service.dart';
+import '../../services/api_client.dart';
 
 class TrackingPage extends StatefulWidget {
   final int orderId;
+
   const TrackingPage({super.key, required this.orderId});
 
   @override
@@ -19,115 +18,110 @@ class TrackingPage extends StatefulWidget {
 }
 
 class _TrackingPageState extends State<TrackingPage> {
+  final api = ApiClient();
   OrderModel? order;
-  Map<String, dynamic>? tracking;
-  Timer? timer;
   bool loading = true;
 
   @override
   void initState() {
     super.initState();
-    _load();
-    timer = Timer.periodic(const Duration(seconds: 5), (_) => _load(silent: true));
+    api.token = context.read<AuthProvider>().apiToken;
+    load();
   }
 
-  @override
-  void dispose() {
-    timer?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _load({bool silent = false}) async {
+  Future<void> load() async {
     try {
-      final service = MaApiService(context.read<AuthProvider>().api);
-      final results = await Future.wait<dynamic>([
-        service.getOrder(widget.orderId),
-        service.tracking(widget.orderId),
-      ]);
-      if (!mounted) return;
-      setState(() {
-        order = results[0] as OrderModel;
-        tracking = Map<String, dynamic>.from(results[1] as Map);
-        loading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      if (!silent) setState(() => loading = false);
-    }
-  }
-
-  LatLng? _point(Object? lat, Object? lng) {
-    final a = lat is num ? lat.toDouble() : double.tryParse('$lat');
-    final b = lng is num ? lng.toDouble() : double.tryParse('$lng');
-    return a == null || b == null ? null : LatLng(a, b);
+      final data = await api.request(
+        'GET',
+        '/orders/${widget.orderId}',
+        authenticated: true,
+      );
+      order = OrderModel.fromJson(data['order']);
+    } catch (_) {}
+    if (mounted) setState(() => loading = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    final pickup = _point(order?.pickupLat, order?.pickupLng);
-    final destination = _point(order?.destinationLat, order?.destinationLng);
-    final driverLocation = tracking?['driver_location'] is Map
-        ? Map<String, dynamic>.from(tracking!['driver_location'] as Map)
-        : null;
-    final current = _point(driverLocation?['latitude'], driverLocation?['longitude']);
+    final deliverer = order?.deliverer;
+    final lat = (deliverer?['position_lat'] as num?)?.toDouble();
+    final lng = (deliverer?['position_lng'] as num?)?.toDouble();
+
+    final center = LatLng(lat ?? 9.3372, lng ?? 2.6303);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Suivi de la commande #${widget.orderId}'),
-        actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh))],
-      ),
+      appBar: AppBar(title: Text('Commande #${widget.orderId}')),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
                 Expanded(
-                  flex: 3,
+                  flex: 2,
                   child: FlutterMap(
                     options: MapOptions(
-                      initialCenter: current ?? pickup ?? const LatLng(9.3372, 2.6303),
+                      initialCenter: center,
                       initialZoom: 14,
                     ),
                     children: [
                       TileLayer(
-                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                         userAgentPackageName: 'com.ma3h.ma_livraison',
                       ),
-                      if (pickup != null && destination != null)
-                        PolylineLayer(
-                          polylines: [Polyline(points: [pickup, destination], color: AppColors.primary, strokeWidth: 4)],
+                      if (lat != null && lng != null)
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: LatLng(lat, lng),
+                              width: 50,
+                              height: 50,
+                              child: const Icon(
+                                Icons.delivery_dining,
+                                size: 42,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ],
                         ),
-                      MarkerLayer(
-                        markers: [
-                          if (pickup != null) Marker(point: pickup, width: 42, height: 42, child: const Icon(Icons.trip_origin, color: Colors.green, size: 34)),
-                          if (destination != null) Marker(point: destination, width: 42, height: 42, child: const Icon(Icons.flag, color: Colors.red, size: 34)),
-                          if (current != null) Marker(point: current, width: 50, height: 50, child: const Icon(Icons.delivery_dining, color: AppColors.primary, size: 42)),
-                        ],
-                      ),
                     ],
                   ),
                 ),
                 Expanded(
-                  flex: 2,
                   child: ListView(
-                    padding: const EdgeInsets.all(18),
+                    padding: const EdgeInsets.all(20),
                     children: [
-                      Text('Statut : ${order?.statut ?? '-'}', style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: AppColors.primaryDark)),
-                      const SizedBox(height: 10),
-                      if (order?.distanceTravelledKm != null)
-                        ListTile(
-                          leading: const Icon(Icons.route),
-                          title: const Text('Distance réellement parcourue'),
-                          trailing: Text('${order!.distanceTravelledKm!.toStringAsFixed(2)} km'),
+                      Text(
+                        'Statut : ${order?.statut ?? '-'}',
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.primaryDark,
                         ),
-                      if (order?.pickupAdresse != null)
-                        ListTile(title: const Text('Départ / récupération'), subtitle: Text(order!.pickupAdresse!)),
-                      if (order?.destAdresse != null)
-                        ListTile(title: const Text('Réception'), subtitle: Text(order!.destAdresse!)),
-                      if (order?.deliverer != null)
+                      ),
+                      const SizedBox(height: 12),
+                      if (deliverer != null)
+                        Card(
+                          child: ListTile(
+                            leading: const CircleAvatar(
+                              child: Icon(Icons.person),
+                            ),
+                            title: Text(deliverer['nom'] ?? 'Livreur'),
+                            subtitle: Text(
+                              deliverer['telephone'] ?? '',
+                            ),
+                          ),
+                        ),
+                      if (order?.prixEstime != null)
                         ListTile(
-                          leading: const CircleAvatar(child: Icon(Icons.person)),
-                          title: Text('${order!.deliverer!['name'] ?? order!.deliverer!['nom'] ?? 'Livreur'}'),
-                          subtitle: Text('${order!.deliverer!['phone'] ?? order!.deliverer!['telephone'] ?? ''}'),
+                          title: const Text('Prix estimé'),
+                          trailing: Text('${order!.prixEstime} FCFA'),
+                        ),
+                      if (order?.distanceKm != null)
+                        ListTile(
+                          title: const Text('Distance'),
+                          trailing: Text(
+                            '${order!.distanceKm!.toStringAsFixed(1)} km',
+                          ),
                         ),
                     ],
                   ),

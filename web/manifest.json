@@ -1,11 +1,12 @@
 {
-    "name": "ma_livraison",
-    "short_name": "ma_livraison",
-    "start_url": ".",
+    "name": "MA Livraison",
+    "short_name": "MA Livraison",
+    "start_url": "/",
+    "scope": "/",
     "display": "standalone",
-    "background_color": "#0175C2",
+    "background_color": "#FFFFFF",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "MA Livraison - Commandes, livraison et suivi en temps réel.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

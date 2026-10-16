@@ -51,10 +51,12 @@ class AuthProvider extends ChangeNotifier {
       user = UserModel.fromJson(rawUser);
       await StorageService.saveSession(token: api.token!, userJson: jsonEncode(rawUser));
       return true;
-    } catch (e) {
-      error = _message(e, 'Connexion impossible. Vérifiez vos identifiants.');
-      return false;
-    } finally {
+    } catch (e, stackTrace) {
+  debugPrint('ERREUR INSCRIPTION : $e');
+  debugPrintStack(stackTrace: stackTrace);
+  error = _messageRegister(e);
+  return false;
+}finally {
       loading = false;
       notifyListeners();
     }

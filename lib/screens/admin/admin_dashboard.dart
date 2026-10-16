@@ -1,4 +1,3 @@
-
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -28,6 +27,8 @@ class _AdminDashboardState extends State<AdminDashboard>
   List<OrderModel> orders = [];
   List<Map<String, dynamic>> products = [];
   List<Map<String, dynamic>> advertisements = [];
+  List<Map<String, dynamic>> notifications = [];
+  int unreadNotifications = 0;
   bool loading = true;
   String? error;
   String orderStatusFilter = '';
@@ -47,6 +48,94 @@ class _AdminDashboardState extends State<AdminDashboard>
   void dispose() {
     _tabs.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadNotifications() async {
+    try {
+      final data = await _serviceForContext(context).adminNotifications();
+      if (!mounted) return;
+
+      setState(() {
+        notifications = ((data['notifications'] as List?) ?? [])
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+        unreadNotifications = (data['unread_count'] as num?)?.toInt() ?? 0;
+      });
+    } catch (e) {
+      debugPrint('Chargement des notifications impossible : $e');
+    }
+  }
+
+  Future<void> _showNotifications() async {
+    await _loadNotifications();
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(
+              'Notifications${unreadNotifications > 0 ? ' ($unreadNotifications non lue(s))' : ''}'),
+          content: SizedBox(
+            width: 450,
+            child: notifications.isEmpty
+                ? const Text('Aucune notification.')
+                : ListView(
+                    shrinkWrap: true,
+                    children: notifications.map((notification) {
+                      final data = notification['data'] is Map
+                          ? Map<String, dynamic>.from(
+                              notification['data'] as Map)
+                          : <String, dynamic>{};
+                      final id = notification['id']?.toString() ?? '';
+                      final isUnread = notification['read_at'] == null;
+
+                      return ListTile(
+                        leading: Icon(
+                          isUnread
+                              ? Icons.notifications_active
+                              : Icons.notifications_none,
+                        ),
+                        title:
+                            Text((data['title'] ?? 'Notification').toString()),
+                        subtitle: Text((data['message'] ?? '').toString()),
+                        trailing: isUnread
+                            ? TextButton(
+                                onPressed: () async {
+                                  try {
+                                    await _serviceForContext(dialogContext)
+                                        .markAdminNotificationAsRead(id);
+                                    await _loadNotifications();
+                                    if (mounted) setDialogState(() {});
+                                  } catch (e) {
+                                    _toast(
+                                        'Impossible de marquer comme lue : $e',
+                                        error: true);
+                                  }
+                                },
+                                child: const Text('Marquer lue'),
+                              )
+                            : const Icon(Icons.check, size: 18),
+                        onTap: () {
+                          final orderId = data['order_id'];
+                          if (orderId != null) {
+                            Navigator.pop(dialogContext);
+                            _tabs.animateTo(1);
+                          }
+                        },
+                      );
+                    }).toList(),
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Fermer'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _loadAll() async {
@@ -81,6 +170,7 @@ class _AdminDashboardState extends State<AdminDashboard>
             .toList();
         loading = false;
       });
+      await _loadNotifications();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -120,7 +210,8 @@ class _AdminDashboardState extends State<AdminDashboard>
         children: availableDrivers.map((driver) {
           final id = _toInt(driver['id']);
           return SimpleDialogOption(
-            onPressed: id == null ? null : () => Navigator.pop(dialogContext, id),
+            onPressed:
+                id == null ? null : () => Navigator.pop(dialogContext, id),
             child: ListTile(
               leading: const CircleAvatar(child: Icon(Icons.delivery_dining)),
               title: Text(_driverName(driver)),
@@ -224,8 +315,7 @@ class _AdminDashboardState extends State<AdminDashboard>
     if (result == true) await _loadAll();
   }
 
-  Future<void> _deleteAdvertisement(
-      Map<String, dynamic> advertisement) async {
+  Future<void> _deleteAdvertisement(Map<String, dynamic> advertisement) async {
     final id = _toInt(advertisement['id']);
     if (id == null) return;
 
@@ -293,7 +383,19 @@ class _AdminDashboardState extends State<AdminDashboard>
         title: const Text('Administration MA Livraison'),
         actions: [
           IconButton(
-            onPressed: _loadAll,
+            tooltip: 'Notifications',
+            onPressed: _showNotifications,
+            icon: Badge(
+              isLabelVisible: unreadNotifications > 0,
+              label: Text('$unreadNotifications'),
+              child: const Icon(Icons.notifications_outlined),
+            ),
+          ),
+          IconButton(
+            onPressed: () async {
+              await _loadAll();
+              await _loadNotifications();
+            },
             tooltip: 'Actualiser',
             icon: const Icon(Icons.refresh),
           ),
@@ -367,11 +469,31 @@ class _AdminDashboardState extends State<AdminDashboard>
   Widget _buildDashboard() {
     final cards = <Map<String, dynamic>>[
       {'title': 'Clients', 'value': stats['clients'], 'icon': Icons.people},
-      {'title': 'Livreurs', 'value': stats['drivers'], 'icon': Icons.delivery_dining},
-      {'title': 'Disponibles', 'value': stats['drivers_available'], 'icon': Icons.check_circle},
-      {'title': 'Commandes', 'value': stats['orders_total'], 'icon': Icons.receipt_long},
-      {'title': 'En cours', 'value': stats['orders_active'], 'icon': Icons.route},
-      {'title': 'Terminées', 'value': stats['orders_completed'], 'icon': Icons.done_all},
+      {
+        'title': 'Livreurs',
+        'value': stats['drivers'],
+        'icon': Icons.delivery_dining
+      },
+      {
+        'title': 'Disponibles',
+        'value': stats['drivers_available'],
+        'icon': Icons.check_circle
+      },
+      {
+        'title': 'Commandes',
+        'value': stats['orders_total'],
+        'icon': Icons.receipt_long
+      },
+      {
+        'title': 'En cours',
+        'value': stats['orders_active'],
+        'icon': Icons.route
+      },
+      {
+        'title': 'Terminées',
+        'value': stats['orders_completed'],
+        'icon': Icons.done_all
+      },
     ];
 
     return RefreshIndicator(
@@ -480,12 +602,14 @@ class _AdminDashboardState extends State<AdminDashboard>
   }
 
   Widget _buildOrders() {
-    final pending = orders.where((o) => ![
-          'livree',
-          'annulee',
-          'refusee',
-          'echec',
-        ].contains(o.statut)).toList();
+    final pending = orders
+        .where((o) => ![
+              'livree',
+              'annulee',
+              'refusee',
+              'echec',
+            ].contains(o.statut))
+        .toList();
 
     return RefreshIndicator(
       onRefresh: _loadAll,
@@ -504,12 +628,17 @@ class _AdminDashboardState extends State<AdminDashboard>
                 value: orderStatusFilter.isEmpty ? null : orderStatusFilter,
                 hint: const Text('Filtrer'),
                 items: const [
-                  DropdownMenuItem(value: 'en_attente', child: Text('En attente')),
-                  DropdownMenuItem(value: 'livreur_reserve', child: Text('Attribuée')),
-                  DropdownMenuItem(value: 'livreur_accepte', child: Text('Acceptée')),
+                  DropdownMenuItem(
+                      value: 'en_attente', child: Text('En attente')),
+                  DropdownMenuItem(
+                      value: 'livreur_reserve', child: Text('Attribuée')),
+                  DropdownMenuItem(
+                      value: 'livreur_accepte', child: Text('Acceptée')),
                   DropdownMenuItem(value: 'en_cours', child: Text('En cours')),
-                  DropdownMenuItem(value: 'colis_recupere', child: Text('Colis récupéré')),
-                  DropdownMenuItem(value: 'en_livraison', child: Text('En livraison')),
+                  DropdownMenuItem(
+                      value: 'colis_recupere', child: Text('Colis récupéré')),
+                  DropdownMenuItem(
+                      value: 'en_livraison', child: Text('En livraison')),
                   DropdownMenuItem(value: 'livree', child: Text('Livrée')),
                   DropdownMenuItem(value: 'annulee', child: Text('Annulée')),
                 ],
@@ -639,7 +768,10 @@ class _AdminDashboardState extends State<AdminDashboard>
   }
 
   Widget _driverImage(Map<String, dynamic> driver) {
-    final url = context.read<AuthProvider>().api.mediaUrl(driver['photo_url']?.toString());
+    final url = context
+        .read<AuthProvider>()
+        .api
+        .mediaUrl(driver['photo_url']?.toString());
     if (url != null && url.isNotEmpty) {
       return CircleAvatar(
         backgroundImage: NetworkImage(url),
@@ -683,8 +815,7 @@ class _AdminDashboardState extends State<AdminDashboard>
             Wrap(
               spacing: 8,
               children: [
-                for (final category in categories)
-                  Chip(label: Text(category)),
+                for (final category in categories) Chip(label: Text(category)),
               ],
             ),
           const SizedBox(height: 12),
@@ -730,14 +861,20 @@ class _AdminDashboardState extends State<AdminDashboard>
   }
 
   Widget _productImage(Map<String, dynamic> product) {
-    final url = context.read<AuthProvider>().api.mediaUrl(product['image_url']?.toString());
+    final url = context
+        .read<AuthProvider>()
+        .api
+        .mediaUrl(product['image_url']?.toString());
     if (url != null && url.isNotEmpty) {
       return SizedBox(
         width: 60,
         height: 60,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(10),
-          child: Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+          child: Image.network(url,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) =>
+                  const Icon(Icons.broken_image_outlined)),
         ),
       );
     }
@@ -809,14 +946,18 @@ class _AdminDashboardState extends State<AdminDashboard>
   }
 
   Widget _adImage(Map<String, dynamic> ad) {
-    final url = context.read<AuthProvider>().api.mediaUrl(ad['image_url']?.toString());
+    final url =
+        context.read<AuthProvider>().api.mediaUrl(ad['image_url']?.toString());
     if (url != null && url.isNotEmpty) {
       return SizedBox(
         width: 72,
         height: 52,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+          child: Image.network(url,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) =>
+                  const Icon(Icons.broken_image_outlined)),
         ),
       );
     }
@@ -1079,8 +1220,7 @@ class _DriverFormDialogState extends State<_DriverFormDialog> {
 
   Future<void> submit() async {
     if (!formKey.currentState!.validate()) return;
-    final service =
-        MaApiService(context.read<AuthProvider>().api);
+    final service = MaApiService(context.read<AuthProvider>().api);
 
     try {
       if (editing) {
@@ -1149,15 +1289,17 @@ class _DriverFormDialogState extends State<_DriverFormDialog> {
                 TextFormField(
                   controller: name,
                   decoration: const InputDecoration(labelText: 'Nom complet'),
-                  validator: (value) =>
-                      value == null || value.trim().isEmpty ? 'Obligatoire' : null,
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Obligatoire'
+                      : null,
                 ),
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: phone,
                   decoration: const InputDecoration(labelText: 'Téléphone'),
-                  validator: (value) =>
-                      value == null || value.trim().isEmpty ? 'Obligatoire' : null,
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Obligatoire'
+                      : null,
                 ),
                 const SizedBox(height: 10),
                 TextFormField(
@@ -1322,7 +1464,9 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.product == null ? 'Ajouter un produit' : 'Modifier le produit'),
+      title: Text(widget.product == null
+          ? 'Ajouter un produit'
+          : 'Modifier le produit'),
       content: SizedBox(
         width: 560,
         child: Form(
@@ -1333,15 +1477,25 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                 if (imageBytes != null)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.memory(imageBytes!, height: 170, width: double.infinity, fit: BoxFit.cover),
+                    child: Image.memory(imageBytes!,
+                        height: 170, width: double.infinity, fit: BoxFit.cover),
                   )
-                else if ((widget.product?['image_url'] ?? '').toString().isNotEmpty)
+                else if ((widget.product?['image_url'] ?? '')
+                    .toString()
+                    .isNotEmpty)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: Image.network(
-                      context.read<AuthProvider>().api.mediaUrl(widget.product!['image_url'].toString())!,
-                      height: 170, width: double.infinity, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const SizedBox(height: 120, child: Icon(Icons.broken_image_outlined, size: 50)),
+                      context
+                          .read<AuthProvider>()
+                          .api
+                          .mediaUrl(widget.product!['image_url'].toString())!,
+                      height: 170,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox(
+                          height: 120,
+                          child: Icon(Icons.broken_image_outlined, size: 50)),
                     ),
                   ),
                 const SizedBox(height: 10),
@@ -1350,13 +1504,16 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                   child: OutlinedButton.icon(
                     onPressed: pickImage,
                     icon: const Icon(Icons.image_outlined),
-                    label: Text(imageBytes == null ? 'Choisir une image' : 'Image sélectionnée'),
+                    label: Text(imageBytes == null
+                        ? 'Choisir une image'
+                        : 'Image sélectionnée'),
                   ),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: name,
-                  decoration: const InputDecoration(labelText: 'Nom du produit'),
+                  decoration:
+                      const InputDecoration(labelText: 'Nom du produit'),
                   validator: (v) =>
                       v == null || v.trim().isEmpty ? 'Obligatoire' : null,
                 ),
@@ -1387,8 +1544,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                 TextFormField(
                   controller: description,
                   maxLines: 4,
-                  decoration:
-                      const InputDecoration(labelText: 'Description'),
+                  decoration: const InputDecoration(labelText: 'Description'),
                 ),
                 const SizedBox(height: 4),
                 SwitchListTile(
@@ -1521,15 +1677,23 @@ class _AdvertisementFormDialogState extends State<_AdvertisementFormDialog> {
                 if (imageBytes != null)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.memory(imageBytes!, height: 170, width: double.infinity, fit: BoxFit.cover),
+                    child: Image.memory(imageBytes!,
+                        height: 170, width: double.infinity, fit: BoxFit.cover),
                   )
-                else if ((widget.advertisement?['image_url'] ?? '').toString().isNotEmpty)
+                else if ((widget.advertisement?['image_url'] ?? '')
+                    .toString()
+                    .isNotEmpty)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: Image.network(
-                      context.read<AuthProvider>().api.mediaUrl(widget.advertisement!['image_url'].toString())!,
-                      height: 170, width: double.infinity, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const SizedBox(height: 120, child: Icon(Icons.broken_image_outlined, size: 50)),
+                      context.read<AuthProvider>().api.mediaUrl(
+                          widget.advertisement!['image_url'].toString())!,
+                      height: 170,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox(
+                          height: 120,
+                          child: Icon(Icons.broken_image_outlined, size: 50)),
                     ),
                   ),
                 const SizedBox(height: 10),

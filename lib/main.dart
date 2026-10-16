@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
@@ -12,21 +14,11 @@ import 'services/push_notification_service.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  // Initialisation des notifications push.
-  // La clé VAPID sera fournie à initialize().
-  if (kIsWeb) {
-  await PushNotificationService.instance.initialize(
-    vapidKey: 'BJWEExh2-UTg4pmZmZSJ9LuKTU4XbMDsnbPQ5EBO9D_Q6fDmbSE7-EqeAmmf-w9cO6IIQUYSbRITKbqwcTV5sxM',
-  );
-}
-
+  // Préparer l'application sans attendre Firebase.
   final api = ApiClient();
   final auth = AuthProvider(api);
 
+  // Afficher immédiatement l'interface Flutter.
   runApp(
     ChangeNotifierProvider<AuthProvider>.value(
       value: auth,
@@ -34,5 +26,30 @@ Future<void> main() async {
     ),
   );
 
-  await auth.restoreSession();
+  // Restaurer la session indépendamment de Firebase.
+  unawaited(auth.restoreSession());
+
+  // Initialiser Firebase en arrière-plan.
+  unawaited(_initializeFirebase());
+}
+
+Future<void> _initializeFirebase() async {
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+
+    debugPrint('Firebase initialisé avec succès.');
+
+    // Les notifications push Web restent activées.
+    if (kIsWeb) {
+      await PushNotificationService.instance.initialize(
+        vapidKey:
+            'BJWEExh2-UTg4pmZmZSJ9LuKTU4XbMDsnbPQ5EBO9D_Q6fDmbSE7-EqeAmmf-w9cO6IIQUYSbRITKbqwcTV5sxM',
+      );
+    }
+  } catch (e, stackTrace) {
+    debugPrint('Erreur d’initialisation Firebase : $e');
+    debugPrintStack(stackTrace: stackTrace);
+  }
 }

@@ -20,8 +20,10 @@ class _CartPageState extends State<CartPage> {
   bool checkoutLoading = false;
   String? error;
 
+  final pickup = TextEditingController();
   final destination = TextEditingController();
   final note = TextEditingController();
+  PickedLocation? pickupLocation;
   PickedLocation? destinationLocation;
 
   @override
@@ -32,6 +34,7 @@ class _CartPageState extends State<CartPage> {
 
   @override
   void dispose() {
+    pickup.dispose();
     destination.dispose();
     note.dispose();
     super.dispose();
@@ -51,7 +54,7 @@ class _CartPageState extends State<CartPage> {
   List<Map<String, dynamic>> get items => ((data?['cart'] as Map?)?['items'] as List? ?? [])
       .map((e) => Map<String, dynamic>.from(e as Map)).toList();
 
-  int get subtotal => _toInt((data?['cart'] as Map?)?['subtotal']);
+  int get subtotal => _toInt((data?['cart'] as Map?)?['subtotal']) ?? 0;
   int _toInt(Object? v) => v is num ? v.toInt() : int.tryParse(v?.toString() ?? '') ?? 0;
 
   Future<void> _update(int id, int quantity) async {
@@ -68,42 +71,36 @@ class _CartPageState extends State<CartPage> {
     }
   }
 
-  Future<void> _pickDestination() async {
-    final result = await Navigator.push<PickedLocation>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => MapPickerPage(
-          title: 'Choisir votre position de livraison',
-          initialLocation: destinationLocation,
-        ),
-      ),
-    );
+  Future<void> _pick(bool pickupMode) async {
+    final current = pickupMode ? pickupLocation : destinationLocation;
+    final result = await Navigator.push<PickedLocation>(context, MaterialPageRoute(builder: (_) => MapPickerPage(
+      title: pickupMode ? 'Position de départ du panier' : 'Position de réception du panier',
+      initialLocation: current,
+    )));
     if (result == null || !mounted) return;
     setState(() {
-      destinationLocation = result;
-      if (destination.text.trim().isEmpty) destination.text = result.label;
+      if (pickupMode) { pickupLocation = result; if (pickup.text.trim().isEmpty) pickup.text = result.label; }
+      else { destinationLocation = result; if (destination.text.trim().isEmpty) destination.text = result.label; }
     });
   }
 
   Future<void> _checkout() async {
     if (items.isEmpty) return;
-    if (destinationLocation == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Indiquez votre position de livraison sur la carte.')));
-      return;
-    }
-    final instruction = note.text.trim();
-    if (instruction.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('L’instruction est obligatoire. Décrivez les produits souhaités et toute précision utile.')));
+    if (pickupLocation == null || destinationLocation == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Choisissez les deux positions sur la carte.')));
       return;
     }
     setState(() => checkoutLoading = true);
     try {
       final api = context.read<AuthProvider>().api;
       final response = await api.request('POST', '/cart/checkout', authenticated: true, body: {
+        'pickup_address': pickup.text.trim().isEmpty ? pickupLocation!.label : pickup.text.trim(),
+        'pickup_latitude': pickupLocation!.latitude,
+        'pickup_longitude': pickupLocation!.longitude,
         'destination_address': destination.text.trim().isEmpty ? destinationLocation!.label : destination.text.trim(),
         'destination_latitude': destinationLocation!.latitude,
         'destination_longitude': destinationLocation!.longitude,
-        'note': instruction,
+        'note': note.text.trim().isEmpty ? null : note.text.trim(),
       });
       final order = Map<String, dynamic>.from(response['order'] as Map);
       if (!mounted) return;
@@ -150,31 +147,17 @@ class _CartPageState extends State<CartPage> {
                         const SizedBox(height: 12),
                         Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [
                           _line('Sous-total produits', subtotal),
-                          const Align(alignment: Alignment.centerLeft, child: Padding(padding: EdgeInsets.only(top: 8), child: Text('Les frais de livraison seront calculés à partir de la distance réellement parcourue. Les 100 FCFA de service sont ajoutés séparément.'))),
+                          const Align(alignment: Alignment.centerLeft, child: Padding(padding: EdgeInsets.only(top: 8), child: Text('Les frais de course seront calculés côté serveur au moment de la commande.'))),
                         ]))),
                         const SizedBox(height: 12),
-                        Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Row(children: [const Expanded(child: Text('Votre position de livraison', style: TextStyle(fontWeight: FontWeight.bold))), FilledButton.tonalIcon(onPressed: _pickDestination, icon: const Icon(Icons.map_outlined), label: const Text('Carte'))]),
-                          TextField(controller: destination, decoration: const InputDecoration(labelText: 'Adresse / repère', hintText: 'Ex. maison bleue près du marché...')),
+                        Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [
+                          Row(children: [const Expanded(child: Text('Départ', style: TextStyle(fontWeight: FontWeight.bold))), FilledButton.tonalIcon(onPressed: () => _pick(true), icon: const Icon(Icons.map_outlined), label: const Text('Carte'))]),
+                          TextField(controller: pickup, decoration: const InputDecoration(hintText: 'Adresse ou repère de départ')),
                           const SizedBox(height: 14),
-                          TextField(
-                            controller: note,
-                            minLines: 4,
-                            maxLines: 7,
-                            maxLength: 1000,
-                            textCapitalization: TextCapitalization.sentences,
-                            decoration: const InputDecoration(
-                              labelText: 'Instruction *',
-                              hintText: 'Ex: description de votre commande.',
-                              helperText: 'Décrivez les produits souhaités et toute précision utile pour le livreur.',
-                              prefixIcon: Padding(
-                                padding: EdgeInsets.only(bottom: 48),
-                                child: Icon(Icons.notes_outlined),
-                              ),
-                              alignLabelWithHint: true,
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
+                          Row(children: [const Expanded(child: Text('Réception', style: TextStyle(fontWeight: FontWeight.bold))), FilledButton.tonalIcon(onPressed: () => _pick(false), icon: const Icon(Icons.map_outlined), label: const Text('Carte'))]),
+                          TextField(controller: destination, decoration: const InputDecoration(hintText: 'Adresse ou repère de réception')),
+                          const SizedBox(height: 14),
+                          TextField(controller: note, maxLines: 2, decoration: const InputDecoration(labelText: 'Instruction (facultatif)')),
                         ]))),
                         const SizedBox(height: 14),
                         SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: checkoutLoading ? null : _checkout, icon: checkoutLoading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.shopping_bag_outlined), label: const Text('Finaliser ma commande'))),

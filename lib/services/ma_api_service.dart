@@ -481,4 +481,22 @@ class MaApiService {
         ? Map<String, dynamic>.from(user['deliverer'] as Map)
         : {};
   }
+
+  Future<Map<String, dynamic>> adminNotifications() async {
+    final data = await api.request(
+      'GET',
+      '/admin/notifications',
+      authenticated: true,
+    );
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  Future<void> markAdminNotificationAsRead(String notificationId) async {
+    await api.request(
+      'PATCH',
+      '/admin/notifications/$notificationId/read',
+      authenticated: true,
+    );
+  }
+
 }

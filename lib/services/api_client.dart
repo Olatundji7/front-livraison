@@ -17,7 +17,6 @@ class ApiClient {
   static const baseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'http://127.0.0.1:8000/api',
-
   );
 
   String? token;
@@ -34,8 +33,18 @@ class ApiClient {
       }
       return value;
     }
+    final apiUri = Uri.tryParse(baseUrl);
+    if (apiUri == null || apiUri.host.isEmpty) return null;
+
+    // Les médias Laravel sont servis depuis /storage, à la racine du site,
+    // et non sous /api. On réutilise l'hôte et le port de l'API.
+    final origin = Uri(
+      scheme: apiUri.scheme,
+      host: apiUri.host,
+      port: apiUri.hasPort ? apiUri.port : null,
+    );
     final normalized = value.startsWith('/') ? value : '/$value';
-    return '$baseUrl$normalized';
+    return origin.resolve(normalized).toString();
   }
 
   Future<dynamic> request(

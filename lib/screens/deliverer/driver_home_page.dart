@@ -34,7 +34,13 @@ class _DriverHomePageState extends State<DriverHomePage> {
       final act = await api.request('GET', '/driver/orders', authenticated: true);
       final list = (av['orders'] as List? ?? []).map((e)=>Map<String,dynamic>.from(e as Map)).toList();
       final all = (act['data'] as List? ?? []).map((e)=>Map<String,dynamic>.from(e as Map)).toList();
-      final activeOrder = all.where((o) => !['livree','annulee','refusee','echec'].contains(o['status'])).toList();
+      // Une commande attribuée mais encore en attente (livreur_reserve) ne doit
+      // pas être considérée comme la course active du livreur.
+      const activeStatuses = {
+        'livreur_accepte', 'en_cours', 'arrivee_retrait',
+        'colis_recupere', 'en_livraison',
+      };
+      final activeOrder = all.where((o) => activeStatuses.contains(o['status'])).toList();
       if (mounted) setState(() { status=(d['status'] ?? 'hors_ligne').toString(); available=list; active=activeOrder.isEmpty?null:activeOrder.first; loading=false; });
     } catch (_) { if (mounted && !silent) setState(() => loading=false); }
   }
@@ -94,20 +100,28 @@ class _DriverHomePageState extends State<DriverHomePage> {
       const Text('Nouvelles commandes',style:TextStyle(fontSize:20,fontWeight:FontWeight.bold)),
       const SizedBox(height:10),
       if(available.isEmpty) const Card(child:Padding(padding:EdgeInsets.all(20),child:Text('Aucune commande en attente.'))),
-      ...available.map((o)=>_orderCard(o)),
+      ...available.map((o)=>_orderCard(o, canAccept: active == null)),
     ])));
   }
-  Widget _orderCard(Map<String,dynamic> o,{bool activeOrder=false}) {
+  Widget _orderCard(Map<String,dynamic> o,{bool activeOrder=false, bool canAccept=true}) {
     final id=_toInt(o['id']); final s=(o['status']??'').toString();
     final action = (s=='en_attente' || s=='livreur_reserve')?'accept':s=='livreur_accepte'?'start':s=='en_cours'?'pickup':s=='colis_recupere'?'deliver':null;
     final label = action=='accept'?'Accepter la commande':action=='start'?'Démarrer':action=='pickup'?'Colis récupéré':action=='deliver'?'Livrer':null;
     return Card(margin:const EdgeInsets.only(bottom:12),child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Commande #$id',style:const TextStyle(fontWeight:FontWeight.bold,fontSize:17)),const SizedBox(height:6),if (s == 'en_attente' || s == 'livreur_reserve') Text(s == 'en_attente' ? 'Une nouvelle commande est disponible.' : 'Commande attribuée par MA Livraison.'),
-    if (s != 'en_attente' && s != 'livreur_reserve') Text('${o['pickup_address']??'-'} → ${o['destination_address']??'-'}'),const SizedBox(height:10),Text('Statut : $s'),
-    if (o['pickup_latitude'] != null && o['pickup_longitude'] != null) ...[
+    if (s != 'en_attente' && s != 'livreur_reserve') Text('${o['pickup_address']??'Départ non renseigné'} → ${o['destination_address']??'Destination GPS'}'),const SizedBox(height:10),Text('Statut : $s'),
+    if (o['destination_latitude'] != null && o['destination_longitude'] != null) ...[
       const SizedBox(height:10),
       SizedBox(width:double.infinity, child: OutlinedButton.icon(onPressed:()=>_openMap(o), icon:const Icon(Icons.map_outlined), label:const Text('Voir la carte et la position client'))),
     ],
-    if(action!=null && id!=null) ...[const SizedBox(height:10),SizedBox(width:double.infinity,child:ElevatedButton(onPressed:()=>_action(id,action),child:Text(label!)))]
+    if(action!=null && id!=null) ...[
+      const SizedBox(height:10),
+      if (action == 'accept' && !canAccept)
+        const Text('Cette commande est en attente. Vous pourrez l’accepter après avoir terminé votre course actuelle.', style: TextStyle(color: Colors.orange)),
+      SizedBox(width:double.infinity,child:ElevatedButton(
+        onPressed: action == 'accept' && !canAccept ? null : () => _action(id,action),
+        child:Text(label!),
+      )),
+    ]
     ])));
   }
   void _openMap(Map<String,dynamic> o) { final model = OrderModel.fromJson(o); Navigator.push(context, MaterialPageRoute(builder: (_) => DriverOrderMapPage(order: model))); }

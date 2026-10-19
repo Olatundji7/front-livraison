@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class ApiException implements Exception {
@@ -14,37 +14,56 @@ class ApiException implements Exception {
 }
 
 class ApiClient {
-  static const baseUrl = String.fromEnvironment(
+  /// Adresse de l'API (serveur en ligne par défaut).
+  ///
+  /// Pour tester avec un serveur local, lancer par exemple :
+  ///   flutter run --dart-define=API_BASE_URL=http://127.0.0.1:8000/api
+  /// (émulateur Android : http://10.0.2.2:8000/api)
+  static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://127.0.0.1:8000/api',
+    defaultValue: 'https://ma.ma3hsarl.com/api',
   );
 
   String? token;
 
+  /// Transforme une valeur renvoyée par l'API (chemin relatif ou URL absolue)
+  /// en URL utilisable par le téléphone.
+  ///
+  /// Les fichiers Laravel sont servis sous /storage, à la racine du site.
+  /// Si l'API renvoie une URL absolue construite avec un mauvais hôte, port ou
+  /// schéma (ex. http://127.0.0.1:8000/storage/... à cause d'APP_URL), on la
+  /// reconstruit avec l'origine réellement utilisée par l'application.
   String? mediaUrl(String? raw) {
     if (raw == null || raw.trim().isEmpty) return null;
     final value = raw.trim();
     if (value.startsWith('data:')) return value;
-    final parsed = Uri.tryParse(value);
-    if (parsed != null && parsed.hasScheme) {
-      final apiUri = Uri.tryParse(baseUrl);
-      if ((parsed.host == '127.0.0.1' || parsed.host == 'localhost') && apiUri != null && apiUri.host.isNotEmpty) {
-        return parsed.replace(host: apiUri.host, port: apiUri.hasPort ? apiUri.port : parsed.port).toString();
-      }
-      return value;
-    }
+
     final apiUri = Uri.tryParse(baseUrl);
     if (apiUri == null || apiUri.host.isEmpty) return null;
-
-    // Les médias Laravel sont servis depuis /storage, à la racine du site,
-    // et non sous /api. On réutilise l'hôte et le port de l'API.
     final origin = Uri(
       scheme: apiUri.scheme,
       host: apiUri.host,
       port: apiUri.hasPort ? apiUri.port : null,
     );
-    final normalized = value.startsWith('/') ? value : '/$value';
-    return origin.resolve(normalized).toString();
+
+    final parsed = Uri.tryParse(value);
+    if (parsed != null && parsed.hasScheme) {
+      final isLocalHost = parsed.host == '127.0.0.1' ||
+          parsed.host == 'localhost' ||
+          parsed.host == '10.0.2.2';
+      final isMedia = parsed.path.startsWith('/storage/') || parsed.path.startsWith('/api/media/');
+      if (isLocalHost || isMedia) {
+        return origin.replace(path: parsed.path, query: parsed.hasQuery ? parsed.query : null).toString();
+      }
+      return value;
+    }
+
+    var path = value.startsWith('/') ? value : '/$value';
+    // Chemin brut du disque public (« drivers/xxx.jpg ») : servi par l'API.
+    if (!path.startsWith('/storage/') && !path.startsWith('/api/media/')) {
+      path = '/api/media$path';
+    }
+    return origin.replace(path: path).toString();
   }
 
   Future<dynamic> request(

@@ -28,7 +28,8 @@ class BrandLogo extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
-        const Column(
+        const Flexible(
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
@@ -36,10 +37,13 @@ class BrandLogo extends StatelessWidget {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.primaryDark),
             ),
             Text(
-              'Rapide • Sûre • Partout',
+              'Rapidité • Fiabilité • Sécurité',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 11, color: AppColors.muted),
             ),
           ],
+        ),
         ),
       ],
     );

@@ -101,6 +101,27 @@ class MaApiService {
     return Map<String, dynamic>.from(data['driver'] as Map);
   }
 
+  /// Réinitialise le mot de passe d'un livreur. Sans [password], le serveur en
+  /// génère un temporaire et le renvoie dans la clé `password`.
+  Future<Map<String, dynamic>> resetDriverPassword(int id, {String? password}) async {
+    final data = await api.request(
+      'POST',
+      '/admin/drivers/$id/reset-password',
+      authenticated: true,
+      body: password == null || password.isEmpty ? <String, dynamic>{} : {'password': password},
+    );
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  Future<void> approveAdminOrder(int orderId, int productPrice) async {
+    await api.request(
+      'POST',
+      '/admin/orders/$orderId/approve',
+      authenticated: true,
+      body: {'product_price': productPrice},
+    );
+  }
+
   Future<void> assignAdminOrder(int orderId, int driverId) async {
     await api.request(
       'POST',
@@ -276,7 +297,8 @@ class MaApiService {
     );
   }
 
-  Future<Map<String, dynamic>> addCartItem(int productId, {int quantity = 1}) async {
+  Future<Map<String, dynamic>> addCartItem(int productId,
+      {int quantity = 1}) async {
     return Map<String, dynamic>.from(await api.request(
       'POST',
       '/cart/items',
@@ -311,9 +333,6 @@ class MaApiService {
   }
 
   Future<OrderModel> checkoutCart({
-    required String pickupAddress,
-    required double pickupLat,
-    required double pickupLng,
     required String destinationAddress,
     required double destinationLat,
     required double destinationLng,
@@ -324,9 +343,6 @@ class MaApiService {
       '/cart/checkout',
       authenticated: true,
       body: {
-        'pickup_address': pickupAddress,
-        'pickup_latitude': pickupLat,
-        'pickup_longitude': pickupLng,
         'destination_address': destinationAddress,
         'destination_latitude': destinationLat,
         'destination_longitude': destinationLng,
@@ -338,9 +354,6 @@ class MaApiService {
 
   Future<OrderModel> createOrder({
     required String type,
-    required String pickupAddress,
-    required double pickupLat,
-    required double pickupLng,
     String? destinationAddress,
     double? destinationLat,
     double? destinationLng,
@@ -348,9 +361,6 @@ class MaApiService {
   }) async {
     final body = <String, dynamic>{
       'type': type,
-      'pickup_address': pickupAddress,
-      'pickup_latitude': pickupLat,
-      'pickup_longitude': pickupLng,
       'note': note,
     };
     if (type == 'livraison') {
@@ -388,8 +398,7 @@ class MaApiService {
   }
 
   Future<OrderModel> getOrder(int id) async {
-    final data =
-        await api.request('GET', '/orders/$id', authenticated: true);
+    final data = await api.request('GET', '/orders/$id', authenticated: true);
     return OrderModel.fromJson(Map<String, dynamic>.from(data['order'] as Map));
   }
 
@@ -474,8 +483,7 @@ class MaApiService {
   }
 
   Future<Map<String, dynamic>> currentDriver() async {
-    final data =
-        await api.request('GET', '/auth/me', authenticated: true);
+    final data = await api.request('GET', '/auth/me', authenticated: true);
     final user = Map<String, dynamic>.from(data['user'] as Map);
     return user['deliverer'] is Map
         ? Map<String, dynamic>.from(user['deliverer'] as Map)
@@ -498,5 +506,4 @@ class MaApiService {
       authenticated: true,
     );
   }
-
 }

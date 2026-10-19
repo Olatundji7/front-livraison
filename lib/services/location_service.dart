@@ -1,7 +1,12 @@
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
 class LocationService {
   static Future<Position> currentPosition() async {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      throw Exception('Le GPS du téléphone est désactivé.');
+    }
+
     var permission = await Geolocator.checkPermission();
 
     if (permission == LocationPermission.denied) {
@@ -20,12 +25,39 @@ class LocationService {
     );
   }
 
+  /// Flux de positions du livreur.
+  ///
+  /// Sur Android, un service de premier plan (notification) maintient le GPS
+  /// actif quand l'écran est éteint ou l'application en arrière-plan.
   static Stream<Position> stream() {
-    return Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
+    late final LocationSettings settings;
+
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      settings = AndroidSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 10,
-      ),
-    );
+        distanceFilter: 5,
+        intervalDuration: const Duration(seconds: 5),
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: 'MA Livraison',
+          notificationText: 'Partage de votre position en cours',
+          enableWakeLock: true,
+        ),
+      );
+    } else if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      settings = AppleSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 5,
+        pauseLocationUpdatesAutomatically: false,
+        showBackgroundLocationIndicator: true,
+        allowBackgroundLocationUpdates: true,
+      );
+    } else {
+      settings = const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 5,
+      );
+    }
+
+    return Geolocator.getPositionStream(locationSettings: settings);
   }
 }

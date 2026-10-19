@@ -3,9 +3,14 @@ class OrderModel {
   final String statut;
   final double? distanceKm;
   final double? distanceTravelledKm;
+  final double? routeDistanceKm;
   final int? prixEstime;
   final int? prixFinal;
   final int? deliveryFee;
+  final int? grossDeliveryFee;
+  final int? discountAmount;
+  final int? productPrice;
+  final int? driverEarnings;
   final int? total;
   final int? serviceFee;
   final String? paymentStatus;
@@ -22,9 +27,14 @@ class OrderModel {
     required this.statut,
     this.distanceKm,
     this.distanceTravelledKm,
+    this.routeDistanceKm,
     this.prixEstime,
     this.prixFinal,
     this.deliveryFee,
+    this.grossDeliveryFee,
+    this.discountAmount,
+    this.productPrice,
+    this.driverEarnings,
     this.total,
     this.serviceFee,
     this.paymentStatus,
@@ -46,9 +56,14 @@ class OrderModel {
       statut: (json['status'] ?? json['statut'] ?? 'en_attente').toString(),
       distanceKm: toDouble(json['distance_km']),
       distanceTravelledKm: toDouble(json['distance_travelled_km']),
+      routeDistanceKm: toDouble(json['route_distance_km'] ?? json['distance_km']),
       prixEstime: toInt(json['prix_estime'] ?? json['total']),
       prixFinal: toInt(json['prix_final']),
       deliveryFee: toInt(json['delivery_fee'] ?? json['net_course_amount']),
+      grossDeliveryFee: toInt(json['gross_delivery_fee']),
+      discountAmount: toInt(json['discount_amount']),
+      productPrice: toInt(json['subtotal']),
+      driverEarnings: toInt(json['driver_earnings'] ?? json['driver_earnings_amount']),
       total: toInt(json['total']),
       serviceFee: toInt(json['service_fee']),
       paymentStatus: json['payment_status']?.toString(),

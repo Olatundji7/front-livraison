@@ -51,12 +51,12 @@ class AuthProvider extends ChangeNotifier {
       user = UserModel.fromJson(rawUser);
       await StorageService.saveSession(token: api.token!, userJson: jsonEncode(rawUser));
       return true;
-    } catch (e, stackTrace) {
-  debugPrint('ERREUR INSCRIPTION : $e');
-  debugPrintStack(stackTrace: stackTrace);
-  error = _messageRegister(e);
-  return false;
-}finally {
+    } catch (e) {
+      error = e is ApiException
+          ? _message(e, 'Téléphone ou mot de passe incorrect.')
+          : 'Serveur injoignable. Vérifiez votre connexion.';
+      return false;
+    } finally {
       loading = false;
       notifyListeners();
     }

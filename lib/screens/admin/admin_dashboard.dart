@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../../core/app_colors.dart';
 import '../../models/order_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/api_client.dart';
 import '../../services/ma_api_service.dart';
 import '../../widgets/driver_avatar.dart';
 
@@ -197,6 +198,53 @@ class _AdminDashboardState extends State<AdminDashboard>
     return value.toString();
   }
 
+  void _showOrderDetails(OrderModel order) {
+    final canApprove = order.statut == 'en_attente' && order.paymentStatus != 'paye';
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Commande #${order.id}'),
+        content: SizedBox(
+          width: 420,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _OrderInfoBlock(order: order),
+                const SizedBox(height: 12),
+                if ((order.total ?? 0) > 0) ...[
+                  Text('Frais de livraison : ${order.deliveryFee ?? 0} FCFA'),
+                  Text('Prix de la commande : ${order.productPrice ?? 0} FCFA'),
+                  Text('Total à payer : ${order.total} FCFA',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                ] else
+                  const Text('Prix à fixer par l’administrateur.'),
+                Text(order.paymentStatus == 'paye' ? 'Payée' : 'Non payée'),
+                if (order.destAdresse != null) Text('Position de livraison : ${order.destAdresse}'),
+                Text('Statut : ${order.statut}'),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Fermer'),
+          ),
+          if (canApprove)
+            FilledButton.icon(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _approveOrder(order);
+              },
+              icon: const Icon(Icons.check_circle_outline),
+              label: const Text('Valider'),
+            ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _approveOrder(OrderModel order) async {
     // Capture le service avant d'ouvrir la boîte de dialogue.
     final service = _serviceForContext(context);
@@ -204,7 +252,7 @@ class _AdminDashboardState extends State<AdminDashboard>
     final productPrice = await showDialog<int>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => _ApproveOrderDialog(order: order),
+      builder: (_) => _ApproveOrderDialog(order: order, service: service),
     );
 
     if (!mounted || productPrice == null) return;
@@ -214,8 +262,8 @@ class _AdminDashboardState extends State<AdminDashboard>
 
       if (!mounted) return;
       _toast(
-        'Commande validée : produit $productPrice FCFA, frais calculés automatiquement. '
-        'Le client paie après confirmation du paiement.',
+        'Commande validée : prix de la commande $productPrice FCFA + frais de livraison '
+        'affichés séparément au client, qui paie le total.',
       );
 
       await _loadAll();
@@ -681,10 +729,16 @@ class _AdminDashboardState extends State<AdminDashboard>
                     color: AppColors.primary,
                   ),
                 ),
-                title: Text('Commande #${order.id}'),
+                title: Text('Commande #${order.id}'
+                    '${order.clientName == null ? '' : ' · ${order.clientName}'}'),
+                onTap: () => _showOrderDetails(order),
                 subtitle: Text(
-                  '${order.paymentStatus == 'paye' ? 'Payée' : ((order.total ?? 0) > 0 ? 'En attente de paiement' : 'Prix à fixer')}\nMontant : ${order.total ?? 0} FCFA'
+                  '${order.paymentStatus == 'paye' ? 'Payée' : ((order.total ?? 0) > 0 ? 'En attente de paiement' : 'Prix à fixer')}'
+                  '${(order.total ?? 0) > 0 ? '\nLivraison : ${order.deliveryFee ?? 0} FCFA · Prix : ${order.productPrice ?? 0} FCFA · Total : ${order.total} FCFA' : ''}'
+                  '${(order.note ?? '').trim().isEmpty ? '' : '\nInstruction : ${order.note!.trim()}'}'
                   '${order.destAdresse == null ? '' : '\nPosition de livraison : ${order.destAdresse}'}',
+                  maxLines: 5,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 isThreeLine: true,
                 trailing: canApprove
@@ -927,7 +981,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                 title: Text((product['name'] ?? 'Produit').toString()),
                 subtitle: Text(
                   '${product['category'] ?? 'Sans catégorie'} • '
-                  '${product['price'] ?? 0} FCFA • Stock ${product['stock'] ?? 0}',
+                  '${product['price'] ?? 0} FCFA',
                 ),
                 trailing: Wrap(
                   spacing: 4,
@@ -1059,18 +1113,30 @@ class _AdminDashboardState extends State<AdminDashboard>
   Widget _buildMap() {
     return _AdminMapTab(
       drivers: drivers,
+      orders: orders,
       service: _serviceForContext(context),
     );
   }
 }
 
+class _RouteInfo {
+  const _RouteInfo(this.orderId, this.from, this.at, this.km, this.min);
+  final int orderId;
+  final LatLng from;
+  final DateTime at;
+  final double? km;
+  final double? min;
+}
+
 class _AdminMapTab extends StatefulWidget {
   const _AdminMapTab({
     required this.drivers,
+    required this.orders,
     required this.service,
   });
 
   final List<Map<String, dynamic>> drivers;
+  final List<OrderModel> orders;
   final MaApiService service;
 
   @override
@@ -1085,6 +1151,12 @@ class _AdminMapTabState extends State<_AdminMapTab> {
   final MapController _map = MapController();
   Timer? _timer;
   late List<Map<String, dynamic>> _drivers;
+  late List<OrderModel> _orders;
+  final Map<int, List<LatLng>> _routes = {};
+  final Map<int, _RouteInfo> _routeInfo = {};
+  bool _routing = false;
+  List<List<LatLng>> _snapped = []; // parcours recalé sur les routes
+  String _snapKey = '';
   int? driverId; // null = tous les livreurs
   bool showPath = false;
   List<LatLng> points = [];
@@ -1097,6 +1169,7 @@ class _AdminMapTabState extends State<_AdminMapTab> {
   void initState() {
     super.initState();
     _drivers = List<Map<String, dynamic>>.from(widget.drivers);
+    _orders = List<OrderModel>.from(widget.orders);
     _timer = Timer.periodic(const Duration(seconds: 5), (_) => _refresh());
     _refresh();
   }
@@ -1126,16 +1199,33 @@ class _AdminMapTabState extends State<_AdminMapTab> {
   Future<void> _refresh() async {
     try {
       final list = await widget.service.adminDrivers();
+      List<OrderModel>? orders;
+      try {
+        orders = await widget.service.adminOrders();
+      } catch (_) {
+        // On garde les commandes déjà connues.
+      }
       List<LatLng>? path;
-      if (showPath && driverId != null) path = await _fetchPath(driverId!);
+      List<List<LatLng>>? snapped;
+      if (showPath && driverId != null) {
+        path = await _fetchPath(driverId!);
+        final key = '${path.length}|${path.isEmpty ? '' : '${path.last.latitude},${path.last.longitude}'}';
+        if (key != _snapKey) {
+          snapped = await _snap(path);
+          _snapKey = key;
+        }
+      }
       if (!mounted) return;
       setState(() {
         _drivers = list;
+        if (orders != null) _orders = orders;
         if (path != null) points = path;
+        if (snapped != null) _snapped = snapped;
         _updatedAt = DateTime.now();
         error = null;
       });
       if (!_fitted) _fit();
+      _updateRoutes();
     } catch (e) {
       if (!mounted) return;
       setState(() => error = 'Actualisation impossible : $e');
@@ -1146,24 +1236,15 @@ class _AdminMapTabState extends State<_AdminMapTab> {
     setState(() {
       driverId = id;
       points = [];
+      _snapped = [];
+      _snapKey = '';
       _fitted = false;
       if (id == null) showPath = false;
     });
     if (showPath && id != null) {
       setState(() => loading = true);
-      _fetchPath(id).then((path) {
-        if (!mounted) return;
-        setState(() {
-          points = path;
-          loading = false;
-        });
-        _fit();
-      }).catchError((Object e) {
-        if (!mounted) return;
-        setState(() {
-          loading = false;
-          error = 'Parcours indisponible : $e';
-        });
+      _refresh().whenComplete(() {
+        if (mounted) setState(() => loading = false);
       });
     }
     _fit();
@@ -1172,9 +1253,122 @@ class _AdminMapTabState extends State<_AdminMapTab> {
   void _togglePath(bool value) {
     setState(() {
       showPath = value;
-      if (!value) points = [];
+      if (!value) {
+        points = [];
+        _snapped = [];
+        _snapKey = '';
+      }
     });
     if (value && driverId != null) _refresh();
+  }
+
+  // ---------- parcours recalé sur les routes ----------
+
+  /// Recale les positions enregistrées sur le réseau routier (OSRM « match »),
+  /// pour afficher un chemin qui suit les rues plutôt qu'une ligne droite.
+  /// En cas d'échec, les points bruts sont reliés.
+  Future<List<List<LatLng>>> _snap(List<LatLng> raw) async {
+    if (raw.length < 2) return [raw];
+    var pts = raw;
+    if (pts.length > 90) {
+      final step = (pts.length / 90).ceil();
+      pts = [for (var i = 0; i < pts.length; i += step) pts[i]];
+      if (pts.last != raw.last) pts.add(raw.last);
+    }
+    try {
+      final data = await widget.service.adminMatch(
+        pts.map((p) => {'lat': p.latitude, 'lng': p.longitude}).toList(),
+      );
+      final lines = <List<LatLng>>[];
+      for (final line in (data['lines'] as List?) ?? const []) {
+        final pointsLine = (line as List)
+            .map((c) => LatLng((c[0] as num).toDouble(), (c[1] as num).toDouble()))
+            .toList();
+        if (pointsLine.length >= 2) lines.add(pointsLine);
+      }
+      return lines.isEmpty ? [raw] : lines;
+    } catch (_) {
+      return [raw];
+    }
+  }
+
+  // ---------- itinéraires ----------
+
+  int? _userId(Map<String, dynamic> d) {
+    final user = d['user'];
+    return _toInt(d['user_id'] ?? (user is Map ? user['id'] : null));
+  }
+
+  /// Commande en cours du livreur (attribuée, non terminée, avec destination).
+  OrderModel? _activeOrder(Map<String, dynamic> d) {
+    const closed = {'en_attente', 'livree', 'annulee', 'refusee', 'echec'};
+    final uid = _userId(d);
+    if (uid == null) return null;
+    for (final o in _orders) {
+      final driverUserId = _toInt(o.deliverer?['id']);
+      if (driverUserId == uid &&
+          !closed.contains(o.statut) &&
+          o.destLat != null &&
+          o.destLng != null) {
+        return o;
+      }
+    }
+    return null;
+  }
+
+  /// Calcule (serveur public OSRM) le chemin routier livreur -> client.
+  /// Recalculé si le livreur s'est déplacé de plus de 80 m ou toutes les 60 s.
+  /// En cas d'échec, une ligne droite sert de repli.
+  Future<void> _updateRoutes() async {
+    if (_routing) return;
+    _routing = true;
+    try {
+      for (final d in _visible()) {
+        final id = _toInt(d['id']);
+        final pos = _pos(d);
+        final order = _activeOrder(d);
+        if (id == null) continue;
+        if (pos == null || order == null) {
+          _routes.remove(id);
+          _routeInfo.remove(id);
+          continue;
+        }
+        final dest = LatLng(order.destLat!, order.destLng!);
+        final info = _routeInfo[id];
+        final moved = info == null
+            ? double.infinity
+            : const Distance().as(LengthUnit.Meter, info.from, pos);
+        final age = info == null ? 9999 : DateTime.now().difference(info.at).inSeconds;
+        if (info != null && info.orderId == order.id && moved < 80 && age < 60) continue;
+
+        try {
+          final data = await widget.service.adminRoute(
+            fromLat: pos.latitude,
+            fromLng: pos.longitude,
+            toLat: dest.latitude,
+            toLng: dest.longitude,
+          );
+          final coords = ((data['coordinates'] as List?) ?? [])
+              .map((c) => LatLng((c[0] as num).toDouble(), (c[1] as num).toDouble()))
+              .toList();
+          if (coords.length < 2) throw Exception('pas de route');
+          _routes[id] = coords;
+          _routeInfo[id] = _RouteInfo(
+            order.id,
+            pos,
+            DateTime.now(),
+            (data['distance_km'] as num?)?.toDouble(),
+            (data['duration_min'] as num?)?.toDouble(),
+          );
+        } catch (_) {
+          _routes.remove(id);
+          _routeInfo[id] = _RouteInfo(order.id, pos, DateTime.now(), null, null);
+        }
+        if (mounted) setState(() {});
+      }
+    } finally {
+      _routing = false;
+    }
   }
 
   // ---------- aides ----------
@@ -1218,6 +1412,9 @@ class _AdminMapTabState extends State<_AdminMapTab> {
   void _fit() {
     final pts = <LatLng>[
       ..._visible().map(_pos).whereType<LatLng>(),
+      for (final d in _visible())
+        if (_activeOrder(d) != null)
+          LatLng(_activeOrder(d)!.destLat!, _activeOrder(d)!.destLng!),
       if (showPath) ...points,
     ];
     if (pts.isEmpty) return;
@@ -1281,6 +1478,27 @@ class _AdminMapTabState extends State<_AdminMapTab> {
     final visible = _visible();
     final located = visible.where((d) => _pos(d) != null).toList();
     final center = located.isNotEmpty ? _pos(located.first)! : _defaultCenter;
+    final routeLines = <Polyline>[];
+    final destinations = <Marker>[];
+    for (final d in located) {
+      final id = _toInt(d['id']);
+      final order = _activeOrder(d);
+      final pos = _pos(d);
+      if (id == null || order == null || pos == null) continue;
+      final dest = LatLng(order.destLat!, order.destLng!);
+      final pts = _routes[id];
+      routeLines.add(Polyline(
+        points: pts != null && pts.length >= 2 ? pts : [pos, dest],
+        color: pts != null ? AppColors.primary : Colors.blueGrey,
+        strokeWidth: pts != null ? 5 : 3,
+      ));
+      destinations.add(Marker(
+        point: dest,
+        width: 40,
+        height: 40,
+        child: const Icon(Icons.flag, color: Colors.red, size: 32),
+      ));
+    }
     final t = _updatedAt;
     final clock =
         '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:${t.second.toString().padLeft(2, '0')}';
@@ -1345,6 +1563,24 @@ class _AdminMapTabState extends State<_AdminMapTab> {
             ],
           ),
         ),
+        if (driverId != null &&
+            _visible().isNotEmpty &&
+            (_age(_visible().first) == null || _age(_visible().first)! > 120))
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Text(
+              'Ce livreur n’envoie plus sa position : son application doit rester ouverte, connectée et avec le GPS autorisé.',
+              style: TextStyle(color: Colors.orange, fontSize: 12),
+            ),
+          ),
+        if (showPath && driverId != null && points.length < 2 && !loading)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Text(
+              'Parcours : pas assez de positions enregistrées (le livreur doit se déplacer).',
+              style: TextStyle(color: Colors.black54, fontSize: 12),
+            ),
+          ),
         if (loading) const LinearProgressIndicator(),
         if (error != null)
           Padding(
@@ -1360,14 +1596,16 @@ class _AdminMapTabState extends State<_AdminMapTab> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.ma3h.ma_livraison',
               ),
+              if (routeLines.isNotEmpty) PolylineLayer(polylines: routeLines),
               if (showPath && points.length >= 2)
                 PolylineLayer(
                   polylines: [
-                    Polyline(
-                      points: points,
-                      color: AppColors.primary.withValues(alpha: .6),
-                      strokeWidth: 4,
-                    ),
+                    for (final line in (_snapped.isEmpty ? [points] : _snapped))
+                      Polyline(
+                        points: line,
+                        color: AppColors.primary.withValues(alpha: .6),
+                        strokeWidth: 4,
+                      ),
                   ],
                 ),
               if (showPath && points.isNotEmpty)
@@ -1381,6 +1619,7 @@ class _AdminMapTabState extends State<_AdminMapTab> {
                     ),
                   ],
                 ),
+              if (destinations.isNotEmpty) MarkerLayer(markers: destinations),
               MarkerLayer(
                 markers: [
                   for (final d in located)
@@ -1396,7 +1635,7 @@ class _AdminMapTabState extends State<_AdminMapTab> {
           ),
         ),
         SizedBox(
-          height: 92,
+          height: 116,
           child: visible.isEmpty
               ? const Center(child: Text('Aucun livreur.'))
               : ListView.separated(
@@ -1407,13 +1646,20 @@ class _AdminMapTabState extends State<_AdminMapTab> {
                   itemBuilder: (context, i) {
                     final d = visible[i];
                     final hasPos = _pos(d) != null;
+                    final order = _activeOrder(d);
+                    final info = _routeInfo[_toInt(d['id'])];
+                    final course = order == null
+                        ? null
+                        : 'Course #${order.id}'
+                            '${info?.km != null ? ' · ${info!.km!.toStringAsFixed(1)} km' : ''}'
+                            '${info?.min != null ? ' · ~${info!.min!.ceil()} min' : ''}';
                     return InkWell(
                       onTap: () {
                         final p = _pos(d);
                         if (p != null) _map.move(p, 16);
                       },
                       child: Container(
-                        width: 220,
+                        width: 240,
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           border: Border.all(color: _color(d), width: 2),
@@ -1439,6 +1685,11 @@ class _AdminMapTabState extends State<_AdminMapTab> {
                                       style: const TextStyle(fontSize: 12)),
                                   Text(hasPos ? _ago(d) : 'aucune position',
                                       style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                                  if (course != null)
+                                    Text(course,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                                 ],
                               ),
                             ),
@@ -1467,10 +1718,76 @@ class _AdminMapTabState extends State<_AdminMapTab> {
   }
 }
 
-class _ApproveOrderDialog extends StatefulWidget {
-  const _ApproveOrderDialog({required this.order});
+/// Client, instruction et produits d'une commande (ce que le client a demandé).
+class _OrderInfoBlock extends StatelessWidget {
+  const _OrderInfoBlock({required this.order});
 
   final OrderModel order;
+
+  @override
+  Widget build(BuildContext context) {
+    final note = (order.note ?? '').trim();
+    final hasClient = order.clientName != null || order.clientPhone != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (hasClient)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: [
+                const Icon(Icons.person_outline, size: 18),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: SelectableText(
+                    '${order.clientName ?? 'Client'}'
+                    '${order.clientPhone == null ? '' : ' · ${order.clientPhone}'}',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.amber.shade50,
+            border: Border.all(color: Colors.amber.shade300),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Instruction du client',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              SelectableText(note.isEmpty ? 'Aucune instruction.' : note),
+            ],
+          ),
+        ),
+        if (order.items.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          const Text('Produits du panier', style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          for (final item in order.items)
+            Text(
+              '• ${item['product'] is Map ? (item['product'] as Map)['name'] ?? 'Produit' : 'Produit'}'
+              ' × ${item['quantity'] ?? 1}'
+              '${item['line_total'] == null ? '' : ' — ${item['line_total']} FCFA'}',
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ApproveOrderDialog extends StatefulWidget {
+  const _ApproveOrderDialog({required this.order, required this.service});
+
+  final OrderModel order;
+  final MaApiService service;
 
   @override
   State<_ApproveOrderDialog> createState() => _ApproveOrderDialogState();
@@ -1479,6 +1796,9 @@ class _ApproveOrderDialog extends StatefulWidget {
 class _ApproveOrderDialogState extends State<_ApproveOrderDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _priceController;
+  Map<String, dynamic>? _pricing;
+  String? _pricingError;
+  bool _loadingPricing = true;
 
   @override
   void initState() {
@@ -1487,6 +1807,8 @@ class _ApproveOrderDialogState extends State<_ApproveOrderDialog> {
     _priceController = TextEditingController(
       text: price != null && price > 0 ? '$price' : '',
     );
+    _priceController.addListener(() => setState(() {}));
+    _loadPricing();
   }
 
   @override
@@ -1495,48 +1817,152 @@ class _ApproveOrderDialogState extends State<_ApproveOrderDialog> {
     super.dispose();
   }
 
-  void _submit() {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+  Future<void> _loadPricing() async {
+    setState(() {
+      _loadingPricing = true;
+      _pricingError = null;
+    });
+    try {
+      final data = await widget.service.adminOrderPricing(widget.order.id);
+      if (!mounted) return;
+      setState(() => _pricing = data);
+    } catch (e) {
+      if (!mounted) return;
+      final body = e is ApiException ? e.body : null;
+      setState(() => _pricingError = body is Map && body['message'] != null
+          ? body['message'].toString()
+          : 'Calcul des frais impossible : $e');
+    } finally {
+      if (mounted) setState(() => _loadingPricing = false);
+    }
+  }
 
-    final price = int.parse(_priceController.text.trim());
-    Navigator.of(context).pop<int>(price);
+  int _num(String key) => (_pricing?[key] as num?)?.toInt() ?? 0;
+  int get _fee => _num('delivery_fee');
+  int? get _price => int.tryParse(_priceController.text.trim());
+
+  void _submit() {
+    if (_pricing == null) return;
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    Navigator.of(context).pop<int>(int.parse(_priceController.text.trim()));
+  }
+
+  Widget _feeBox() {
+    final km = _pricing?['route_distance_km'];
+    final discount = _num('discount_amount');
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        border: Border.all(color: Colors.blue.shade200),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.delivery_dining, size: 20),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('Frais de livraison', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              if (_loadingPricing)
+                const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              else if (_pricing != null)
+                Text('$_fee FCFA', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+            ],
+          ),
+          if (_pricing != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Calculés automatiquement · distance routière ${km is num ? km.toStringAsFixed(1) : '-'} km'
+                ' · tarif ${_num('gross_delivery_fee')} FCFA'
+                '${discount > 0 ? ' · réduction −$discount FCFA' : ''}',
+                style: const TextStyle(fontSize: 12, color: Colors.black54),
+              ),
+            ),
+          if (_pricingError != null) ...[
+            const SizedBox(height: 4),
+            Text(_pricingError!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+            TextButton.icon(
+              onPressed: _loadingPricing ? null : _loadPricing,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Réessayer'),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final price = _price ?? 0;
     return AlertDialog(
       title: Text('Valider la commande #${widget.order.id}'),
       content: Form(
         key: _formKey,
         child: SizedBox(
-          width: 360,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Saisissez le prix du produit. La distance routière depuis MA Livraison, les frais de livraison, la réduction éventuelle et le gain du livreur seront calculés automatiquement par le serveur. Le client paiera le prix du produit + les frais de livraison nets.',
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _priceController,
-                autofocus: true,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Prix du produit (FCFA)',
-                  prefixIcon: Icon(Icons.payments_outlined),
-                  border: OutlineInputBorder(),
+          width: 420,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _OrderInfoBlock(order: widget.order),
+                const SizedBox(height: 16),
+                _feeBox(),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _priceController,
+                  autofocus: true,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Prix de la commande (FCFA)',
+                    prefixIcon: Icon(Icons.payments_outlined),
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    final amount = int.tryParse((value ?? '').trim());
+                    if (amount == null || amount < 1) {
+                      return 'Entrez un prix valide supérieur à 0.';
+                    }
+                    return null;
+                  },
+                  onFieldSubmitted: (_) => _submit(),
                 ),
-                validator: (value) {
-                  final amount = int.tryParse((value ?? '').trim());
-                  if (amount == null || amount < 1) {
-                    return 'Entrez un prix valide supérieur à 0.';
-                  }
-                  return null;
-                },
-                onFieldSubmitted: (_) => _submit(),
-              ),
-            ],
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    border: Border.all(color: Colors.green.shade200),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Total à payer par le client',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 2),
+                      Text('${price + _fee} FCFA',
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                      Text('Prix de la commande $price FCFA + frais de livraison $_fee FCFA',
+                          style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Le client verra séparément les frais de livraison, puis le prix de la commande, et paiera le total.',
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1546,9 +1972,9 @@ class _ApproveOrderDialogState extends State<_ApproveOrderDialog> {
           child: const Text('Annuler'),
         ),
         FilledButton.icon(
-          onPressed: _submit,
+          onPressed: _pricing == null ? null : _submit,
           icon: const Icon(Icons.check_circle_outline),
-          label: const Text('Calculer et valider'),
+          label: const Text('Valider la commande'),
         ),
       ],
     );
@@ -1789,7 +2215,6 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   late final TextEditingController name;
   late final TextEditingController category;
   late final TextEditingController price;
-  late final TextEditingController stock;
   late final TextEditingController description;
   Uint8List? imageBytes;
   String? imageName;
@@ -1802,7 +2227,6 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     name = TextEditingController(text: (p['name'] ?? '').toString());
     category = TextEditingController(text: (p['category'] ?? '').toString());
     price = TextEditingController(text: (p['price'] ?? '').toString());
-    stock = TextEditingController(text: (p['stock'] ?? '').toString());
     description =
         TextEditingController(text: (p['description'] ?? '').toString());
     active = p['is_active'] != false;
@@ -1813,7 +2237,6 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     name.dispose();
     category.dispose();
     price.dispose();
-    stock.dispose();
     description.dispose();
     super.dispose();
   }
@@ -1843,7 +2266,6 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
           name: name.text.trim(),
           category: category.text.trim(),
           price: int.parse(price.text.trim()),
-          stock: int.parse(stock.text.trim()),
           description: description.text.trim(),
           imageBytes: imageBytes,
           imageName: imageName,
@@ -1855,7 +2277,6 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
           name: name.text.trim(),
           category: category.text.trim(),
           price: int.parse(price.text.trim()),
-          stock: int.parse(stock.text.trim()),
           description: description.text.trim(),
           imageBytes: imageBytes,
           imageName: imageName,
@@ -1946,14 +2367,6 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                   controller: price,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(labelText: 'Prix (FCFA)'),
-                  validator: (v) =>
-                      int.tryParse(v ?? '') == null ? 'Nombre invalide' : null,
-                ),
-                const SizedBox(height: 10),
-                TextFormField(
-                  controller: stock,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Stock'),
                   validator: (v) =>
                       int.tryParse(v ?? '') == null ? 'Nombre invalide' : null,
                 ),

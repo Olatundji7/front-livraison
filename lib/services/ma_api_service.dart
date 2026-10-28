@@ -101,6 +101,38 @@ class MaApiService {
     return Map<String, dynamic>.from(data['driver'] as Map);
   }
 
+  /// Chemin routier calculé par le serveur (carte admin).
+  Future<Map<String, dynamic>> adminRoute({
+    required double fromLat,
+    required double fromLng,
+    required double toLat,
+    required double toLng,
+  }) async {
+    final data = await api.request(
+      'GET',
+      '/admin/route',
+      authenticated: true,
+      query: {
+        'from_lat': '$fromLat',
+        'from_lng': '$fromLng',
+        'to_lat': '$toLat',
+        'to_lng': '$toLng',
+      },
+    );
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  /// Recale des positions GPS sur les routes (parcours d'un livreur).
+  Future<Map<String, dynamic>> adminMatch(List<Map<String, double>> points) async {
+    final data = await api.request(
+      'POST',
+      '/admin/route/match',
+      authenticated: true,
+      body: {'points': points},
+    );
+    return Map<String, dynamic>.from(data as Map);
+  }
+
   /// Réinitialise le mot de passe d'un livreur. Sans [password], le serveur en
   /// génère un temporaire et le renvoie dans la clé `password`.
   Future<Map<String, dynamic>> resetDriverPassword(int id, {String? password}) async {
@@ -111,6 +143,16 @@ class MaApiService {
       body: password == null || password.isEmpty ? <String, dynamic>{} : {'password': password},
     );
     return Map<String, dynamic>.from(data as Map);
+  }
+
+  /// Frais de livraison calculés par le serveur, à afficher avant la validation.
+  Future<Map<String, dynamic>> adminOrderPricing(int orderId) async {
+    final data = await api.request(
+      'GET',
+      '/admin/orders/$orderId/pricing-preview',
+      authenticated: true,
+    );
+    return Map<String, dynamic>.from((data as Map)['pricing'] as Map);
   }
 
   Future<void> approveAdminOrder(int orderId, int productPrice) async {
@@ -155,7 +197,6 @@ class MaApiService {
     required String name,
     required String category,
     required int price,
-    required int stock,
     String? description,
     Uint8List? imageBytes,
     String? imageName,
@@ -169,7 +210,6 @@ class MaApiService {
         'name': name,
         'category': category,
         'price': '$price',
-        'stock': '$stock',
         'description': description ?? '',
         'is_active': active ? '1' : '0',
       },
@@ -185,7 +225,6 @@ class MaApiService {
     required String name,
     required String category,
     required int price,
-    required int stock,
     String? description,
     bool active = true,
     Uint8List? imageBytes,
@@ -200,7 +239,6 @@ class MaApiService {
         'name': name,
         'category': category,
         'price': '$price',
-        'stock': '$stock',
         'description': description ?? '',
         'is_active': active ? '1' : '0',
       },

@@ -6,10 +6,18 @@ import '../../providers/auth_provider.dart';
 import 'package:provider/provider.dart';
 
 class PaymentPage extends StatefulWidget {
-  const PaymentPage({super.key, required this.orderId, this.initialAmount});
+  const PaymentPage({
+    super.key,
+    required this.orderId,
+    this.initialAmount,
+    this.deliveryFee,
+    this.productPrice,
+  });
 
   final int orderId;
   final int? initialAmount;
+  final int? deliveryFee;
+  final int? productPrice;
 
   @override
   State<PaymentPage> createState() => _PaymentPageState();
@@ -117,7 +125,19 @@ class _PaymentPageState extends State<PaymentPage> {
                   const SizedBox(height: 16),
                   Text('Commande #${widget.orderId}'),
                   const SizedBox(height: 6),
-                  Text('Montant : $amount FCFA', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  if (widget.deliveryFee != null && widget.productPrice != null) ...[
+                    Row(children: [
+                      const Expanded(child: Text('Frais de livraison')),
+                      Text('${widget.deliveryFee} FCFA'),
+                    ]),
+                    const SizedBox(height: 4),
+                    Row(children: [
+                      const Expanded(child: Text('Prix de la commande')),
+                      Text('${widget.productPrice} FCFA'),
+                    ]),
+                    const Divider(height: 20),
+                  ],
+                  Text('Total à payer : $amount FCFA', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 10),
                   Text(_statusLabel()),
                   if (reference != null) ...[

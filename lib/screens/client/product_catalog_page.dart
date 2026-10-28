@@ -92,7 +92,6 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
             Align(alignment: Alignment.centerLeft, child: Text((product['description'] ?? 'Aucune description.').toString())),
             const SizedBox(height: 8),
             Align(alignment: Alignment.centerLeft, child: Text('Catégorie : ${product['category'] ?? 'Sans catégorie'}')),
-            Align(alignment: Alignment.centerLeft, child: Text('Stock : ${product['stock'] ?? 0}')),
           ]))),
           actions: [
             TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Fermer')),
@@ -128,14 +127,53 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
                   SizedBox(height: 44, child: ListView.separated(scrollDirection: Axis.horizontal, itemCount: categories.length, separatorBuilder: (_, __) => const SizedBox(width: 8), itemBuilder: (_, index) { final item = categories[index]; final selected = category == item; return ChoiceChip(label: Text(item), selected: selected, onSelected: (_) => setState(() => category = item)); })),
                   const SizedBox(height: 18),
                   if (filtered.isEmpty) const Card(child: Padding(padding: EdgeInsets.all(20), child: Text('Aucun produit disponible.'))),
-                  ...filtered.map((product) => Card(clipBehavior: Clip.antiAlias, child: ListTile(contentPadding: const EdgeInsets.all(10), leading: _image(product, api), title: Text((product['name'] ?? 'Produit').toString(), style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text('${product['category'] ?? 'Sans catégorie'}\n${product['price'] ?? 0} FCFA • Stock ${product['stock'] ?? 0}'), isThreeLine: true, onTap: () => _showDetails(product), trailing: IconButton(tooltip: 'Ajouter', onPressed: ((product['stock'] as num?)?.toInt() ?? 0) > 0 ? () => _add(product) : null, icon: const Icon(Icons.add_shopping_cart))))),
+                  if (filtered.isNotEmpty)
+                    GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: MediaQuery.of(context).size.width >= 900 ? 4 : (MediaQuery.of(context).size.width >= 600 ? 3 : 2),
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: 0.8,
+                      children: filtered.map((product) => _productCard(product, api)).toList(),
+                    ),
                 ])),
     );
   }
 
-  Widget _image(Map<String, dynamic> product, dynamic api) {
+  /// Carte produit : l'image occupe la carte ; un clic ouvre les détails et le prix.
+  Widget _productCard(Map<String, dynamic> product, dynamic api) {
     final url = api.mediaUrl(product['image_url']?.toString());
-    if (url == null) return const CircleAvatar(child: Icon(Icons.inventory_2_outlined));
-    return SizedBox(width: 62, height: 62, child: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined))));
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _showDetails(product),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: url == null
+                  ? Container(color: AppColors.primaryLight, child: const Icon(Icons.inventory_2_outlined, size: 48))
+                  : Image.network(
+                      url,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(color: AppColors.primaryLight, child: const Icon(Icons.broken_image_outlined, size: 40)),
+                    ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text((product['name'] ?? 'Produit').toString(), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 2),
+                  Text('${product['price'] ?? 0} FCFA', style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.primary)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

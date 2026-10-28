@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
+import '../screens/auth/forgot_password_page.dart';
 import 'brand_logo.dart';
 
 class LoginDialog extends StatefulWidget {
@@ -100,7 +101,21 @@ class _LoginDialogState extends State<LoginDialog> {
                   textAlign: TextAlign.center,
                 ),
               ],
-              const SizedBox(height: 22),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () {
+                    // Ferme cette fenêtre, puis ouvre la page « Mot de passe oublié ».
+                    final navigator = Navigator.of(context);
+                    navigator.pop();
+                    navigator.push(
+                      MaterialPageRoute(builder: (_) => const ForgotPasswordPage()),
+                    );
+                  },
+                  child: const Text('Mot de passe oublié ?'),
+                ),
+              ),
+              const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(

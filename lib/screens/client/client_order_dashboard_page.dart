@@ -109,6 +109,69 @@ class _ClientOrderDashboardPageState extends State<ClientOrderDashboardPage> {
     }
   }
 
+  int _intOf(Object? v) => v is num ? v.toInt() : (int.tryParse('$v') ?? 0);
+
+  /// Détail du montant : frais de livraison, puis prix de la commande, puis total.
+  Widget _amounts(Map<String, dynamic> o) {
+    final total = _intOf(o['total']);
+    if (total <= 0) {
+      return const ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(Icons.payments),
+        title: Text('Montant'),
+        subtitle: Text('Prix en attente de validation par MA Livraison'),
+      );
+    }
+    final fee = _intOf(o['delivery_fee']);
+    var price = _intOf(o['subtotal']);
+    if (price <= 0) price = total - fee;
+    final discount = _intOf(o['discount_amount']);
+    final km = o['route_distance_km'] is num ? (o['route_distance_km'] as num).toDouble() : null;
+    final hints = [
+      if (km != null && km > 0) 'Distance ${km.toStringAsFixed(1)} km',
+      if (discount > 0) 'réduction de $discount FCFA incluse',
+    ];
+
+    Widget line(String label, int amount, {String? hint, bool strong = false}) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label,
+                        style: TextStyle(
+                            fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
+                            fontSize: strong ? 18 : 15)),
+                    if (hint != null)
+                      Text(hint, style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                  ],
+                ),
+              ),
+              Text('$amount FCFA',
+                  style: TextStyle(
+                      fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
+                      fontSize: strong ? 18 : 15)),
+            ],
+          ),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Détail du montant',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 6),
+        line('Frais de livraison', fee, hint: hints.isEmpty ? null : hints.join(' · ')),
+        line('Prix de la commande', price),
+        const Divider(),
+        line('Total à payer', total, strong: true),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (loading) {
@@ -189,12 +252,9 @@ class _ClientOrderDashboardPageState extends State<ClientOrderDashboardPage> {
                         subtitle:
                             const Text('MA Livraison traite votre demande.'))),
               Card(
-                  child: ListTile(
-                      leading: const Icon(Icons.payments),
-                      title: const Text('Montant'),
-                      subtitle: Text(((o['total'] ?? 0) as num) <= 0
-                          ? 'Prix en attente de validation par MA Livraison'
-                          : '${o['total']} FCFA'))),
+                  child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: _amounts(o))),
               if (status == 'en_attente' &&
                   paymentStatus != 'paye' &&
                   total > 0)
@@ -209,7 +269,7 @@ class _ClientOrderDashboardPageState extends State<ClientOrderDashboardPage> {
                                 fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 6),
                         const Text(
-                            'MA Livraison a fixé le prix. Effectuez le paiement pour que votre commande soit transmise aux livreurs.'),
+                            'MA Livraison a fixé les frais de livraison et le prix de la commande. Payez le total pour que votre commande soit transmise aux livreurs.'),
                         const SizedBox(height: 12),
                         FilledButton.icon(
                           onPressed: () async {
@@ -218,12 +278,14 @@ class _ClientOrderDashboardPageState extends State<ClientOrderDashboardPage> {
                               MaterialPageRoute(
                                   builder: (_) => PaymentPage(
                                       orderId: (o['id'] as num).toInt(),
-                                      initialAmount: total)),
+                                      initialAmount: total,
+                                      deliveryFee: _intOf(o['delivery_fee']),
+                                      productPrice: _intOf(o['subtotal']))),
                             );
                             await _load();
                           },
                           icon: const Icon(Icons.payment),
-                          label: const Text('Payer la commande'),
+                          label: Text('Payer $total FCFA'),
                         ),
                       ],
                     ),

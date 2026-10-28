@@ -21,6 +21,10 @@ class OrderModel {
   final double? destLat;
   final double? destLng;
   final Map<String, dynamic>? deliverer;
+  final String? note;
+  final String? clientName;
+  final String? clientPhone;
+  final List<Map<String, dynamic>> items;
 
   const OrderModel({
     required this.id,
@@ -45,6 +49,10 @@ class OrderModel {
     this.destLat,
     this.destLng,
     this.deliverer,
+    this.note,
+    this.clientName,
+    this.clientPhone,
+    this.items = const [],
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
@@ -76,6 +84,12 @@ class OrderModel {
       deliverer: json['driver'] is Map
           ? Map<String, dynamic>.from(json['driver'] as Map)
           : (json['deliverer'] is Map ? Map<String, dynamic>.from(json['deliverer'] as Map) : null),
+      note: json['note']?.toString(),
+      clientName: json['client'] is Map ? (json['client'] as Map)['name']?.toString() : null,
+      clientPhone: json['client'] is Map ? (json['client'] as Map)['phone']?.toString() : null,
+      items: json['items'] is List
+          ? (json['items'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+          : const [],
     );
   }
 }

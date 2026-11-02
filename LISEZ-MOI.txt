@@ -1,0 +1,31 @@
+MA LIVRAISON - PROFIL MODIFIABLE + NOUVEAU FOND D'ACCUEIL
+=========================================================
+lib/     -> a copier dans le dossier lib/ du projet Flutter (memes chemins)
+assets/  -> a copier a la RACINE du projet Flutter (pas dans lib/) : assets/images/team/accueil_client.jpg
+           (le dossier assets/images/team/ est deja declare dans pubspec.yaml, rien a modifier)
+api/     -> a copier a la racine du projet Laravel (memes chemins)
+
+NOUVEAUTES
+1. Profil client > bouton "Modifier mes informations" : nom, telephone, e-mail,
+   et "Changer mon mot de passe" (ancien + nouveau + confirmation).
+   - Changer le telephone ou l'e-mail demande le mot de passe actuel.
+   - Les autres appareils sont deconnectes apres un changement de mot de passe.
+   - Routes : PUT /api/auth/profile et PUT /api/auth/password (client connecte).
+2. Accueil client : nouvelle image de fond (extrait de votre banniere : le
+   livreur MA Livraison et ses collegues), fondu vers le bleu de la marque.
+   Textes raccourcis pour ne pas couvrir le visage.
+
+MISE EN LIGNE
+- API : copier api/, puis  php artisan optimize:clear   (pas de migration).
+  Verifier : md5sum app/Http/Controllers/Api/ProfileController.php routes/api.php
+1da009a3d1972372b224f018af9035da  app/Http/Controllers/Api/ProfileController.php
+2975409fbfc26d241c565fbc40ab96d3  routes/api.php
+- Flutter : copier lib/ et assets/, puis  flutter analyze  et  flutter build web --release  (ou apk).
+
+TESTS
+- Profil > Modifier : changer le nom (sans mot de passe) ; changer l'e-mail (mot de passe demande) ;
+  numero deja pris -> message clair ; mot de passe actuel faux -> message clair.
+- Se deconnecter puis se reconnecter avec le nouveau mot de passe / nouveau numero.
+- Accueil : verifier l'image sur plusieurs tailles d'ecran.
+
+NON VERIFIE : PHP et Dart n'ont pas ete executes de mon cote.

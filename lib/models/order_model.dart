@@ -22,6 +22,7 @@ class OrderModel {
   final double? destLng;
   final Map<String, dynamic>? deliverer;
   final String? note;
+  final String? createdAt;
   final String? clientName;
   final String? clientPhone;
   final List<Map<String, dynamic>> items;
@@ -50,6 +51,7 @@ class OrderModel {
     this.destLng,
     this.deliverer,
     this.note,
+    this.createdAt,
     this.clientName,
     this.clientPhone,
     this.items = const [],
@@ -85,6 +87,7 @@ class OrderModel {
           ? Map<String, dynamic>.from(json['driver'] as Map)
           : (json['deliverer'] is Map ? Map<String, dynamic>.from(json['deliverer'] as Map) : null),
       note: json['note']?.toString(),
+      createdAt: json['created_at']?.toString(),
       clientName: json['client'] is Map ? (json['client'] as Map)['name']?.toString() : null,
       clientPhone: json['client'] is Map ? (json['client'] as Map)['phone']?.toString() : null,
       items: json['items'] is List

@@ -92,6 +92,61 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// Modifie les informations du client connecté. Renvoie null si tout est bon,
+  /// sinon le message d'erreur à afficher.
+  Future<String?> updateProfile({
+    required String nom,
+    required String telephone,
+    required String email,
+    String? currentPassword,
+  }) async {
+    try {
+      final data = await api.request('PUT', '/auth/profile', authenticated: true, body: {
+        'name': nom.trim(),
+        'phone': telephone.trim(),
+        'email': email.trim().isEmpty ? null : email.trim(),
+        if (currentPassword != null && currentPassword.isNotEmpty) 'current_password': currentPassword,
+      });
+      final rawUser = Map<String, dynamic>.from(data['user'] as Map);
+      user = UserModel.fromJson(rawUser);
+      await StorageService.saveSession(token: api.token!, userJson: jsonEncode(rawUser));
+      notifyListeners();
+      return null;
+    } catch (e) {
+      return _profileMessage(e);
+    }
+  }
+
+  /// Change le mot de passe. Renvoie null si tout est bon, sinon le message d'erreur.
+  Future<String?> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await api.request('PUT', '/auth/password', authenticated: true, body: {
+        'current_password': currentPassword,
+        'password': newPassword,
+      });
+      return null;
+    } catch (e) {
+      return _profileMessage(e);
+    }
+  }
+
+  String _profileMessage(Object e) {
+    if (e is ApiException && e.body is Map) {
+      final body = Map<String, dynamic>.from(e.body as Map);
+      final errors = body['errors'];
+      if (errors is Map && errors.isNotEmpty) {
+        final first = errors.values.first;
+        if (first is List && first.isNotEmpty) return first.first.toString();
+      }
+      if (body['message'] != null) return body['message'].toString();
+    }
+    if (e is ApiException) return 'Modification impossible. Réessayez.';
+    return 'Serveur injoignable. Vérifiez votre connexion.';
+  }
+
   Future<void> logout() async {
     try {
       if (api.token != null) {

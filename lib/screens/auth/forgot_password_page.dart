@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../widgets/auth_announcement_bar.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_colors.dart';
@@ -120,6 +122,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: const AuthAnnouncementBar(),
       backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('Mot de passe oublié')),
       body: Center(
@@ -132,7 +135,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                 padding: const EdgeInsets.all(28),
                 child: Column(
                   children: [
-                    const BrandLogo(size: 64),
+                    const BrandLogo(size: 64, titleSize: 24),
                     const SizedBox(height: 20),
                     Text(
                       codeSent ? 'Nouveau mot de passe' : 'Réinitialiser mon mot de passe',

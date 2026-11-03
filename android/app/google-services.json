@@ -1,0 +1,76 @@
+{
+  "project_info": {
+    "project_number": "1084690560866",
+    "project_id": "ma-livraison-43517",
+    "storage_bucket": "ma-livraison-43517.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1084690560866:android:2c9a06b825657cd750de3b",
+        "android_client_info": {
+          "package_name": "com.example.ma_livraison"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1084690560866-bibstirecrffpeosc7r104q7936por91.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD1ploSOgmoec2BIpHqYia1cPbC3PV7LXU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1084690560866-bibstirecrffpeosc7r104q7936por91.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1084690560866:android:cbfc7e1b95bd92d950de3b",
+        "android_client_info": {
+          "package_name": "com.ma3hsarl.malivraison"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1084690560866-s87pemgsdeq8reor1rt8vib8ngfgilo0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ma3hsarl.malivraison",
+            "certificate_hash": "49dca8a478ac1598a42112f486ac5e7d7a4627e8"
+          }
+        },
+        {
+          "client_id": "1084690560866-bibstirecrffpeosc7r104q7936por91.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD1ploSOgmoec2BIpHqYia1cPbC3PV7LXU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1084690560866-bibstirecrffpeosc7r104q7936por91.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

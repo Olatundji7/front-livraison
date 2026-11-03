@@ -1,0 +1,23 @@
+MA Livraison — correction du filigrane cheval (V5)
+
+Fichiers inclus :
+- lib/screens/auth/register_page.dart : affiche le cheval détouré en grand
+  derrière la carte du formulaire, avec une opacité renforcée.
+- pubspec.yaml : déclare le nouvel asset.
+- assets/branding/ma_livraison_cheval.png : cheval MA Livraison sur fond
+  transparent, isolé du texte MA LIVRAISON.
+
+Installation :
+1. Faites une copie de sauvegarde de votre fichier register_page.dart et
+   de votre pubspec.yaml.
+2. Extrayez l'archive à la racine du projet Flutter en conservant les chemins.
+3. Vérifiez que assets/branding/ma_livraison_logo.png (logo complet) reste
+   présent : il est toujours utilisé pour le logo d'en-tête.
+4. Exécutez :
+     flutter pub get
+     dart format lib/screens/auth/register_page.dart
+     flutter analyze
+     flutter run -d chrome
+
+Cette archive ne modifie que l'écran de création de compte et la déclaration
+de l'asset. Elle ne change ni les routes API ni l'authentification.

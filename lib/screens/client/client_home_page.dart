@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_colors.dart';
 import '../../models/order_model.dart';
@@ -14,7 +15,7 @@ import 'payment_page.dart';
 import 'product_catalog_page.dart';
 
 /// Espace client : trois onglets en bas de l'écran (Accueil, Commandes, Profil).
-/// Sur grand écran (web / tablette), les onglets passent sur le côté.
+/// Sur grand écran (web / tablette), les onglets sont affichés dans la barre du haut.
 class ClientHomePage extends StatefulWidget {
   const ClientHomePage({super.key, required this.clientName});
 
@@ -58,29 +59,31 @@ class _ClientHomePageState extends State<ClientHomePage> {
       appBar: AppBar(
         automaticallyImplyLeading: false,
         titleSpacing: 16,
-        title: const BrandLogo(size: 36),
-      ),
-      body: wide
-          ? Row(
-              children: [
-                NavigationRail(
-                  selectedIndex: _index,
-                  labelType: NavigationRailLabelType.all,
-                  onDestinationSelected: (i) => setState(() => _index = i),
-                  destinations: [
-                    for (final item in _items)
-                      NavigationRailDestination(
-                        icon: Icon(item.$1),
-                        selectedIcon: Icon(item.$2),
-                        label: Text(item.$3),
+        title: const BrandLogo(size: 42),
+        actions: wide
+            ? [
+                for (var i = 0; i < _items.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 5),
+                    child: TextButton.icon(
+                      onPressed: () => setState(() => _index = i),
+                      icon: Icon(
+                        _index == i ? _items[i].$2 : _items[i].$1,
+                        size: 19,
                       ),
-                  ],
-                ),
-                const VerticalDivider(width: 1),
-                Expanded(child: body),
-              ],
-            )
-          : body,
+                      label: Text(_items[i].$3),
+                      style: TextButton.styleFrom(
+                        foregroundColor: _index == i ? AppColors.primary : AppColors.text,
+                        backgroundColor: _index == i ? AppColors.primaryLight : Colors.transparent,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 18),
+              ]
+            : null,
+      ),
+      body: body,
       bottomNavigationBar: wide
           ? null
           : NavigationBar(
@@ -112,6 +115,17 @@ class _HomeTab extends StatelessWidget {
   final VoidCallback onStart;
 
   static const _background = 'assets/images/team/accueil_client.jpg';
+  // Numéro principal affiché sur le support officiel MA Livraison (format international).
+  // À confirmer si un autre numéro est dédié au WhatsApp de l'assistance.
+  static const _whatsAppNumber = '2290129300303';
+
+  Future<void> _contactWhatsApp() async {
+    final message = Uri.encodeComponent(
+      'Bonjour MA Livraison, j\'ai besoin d\'assistance concernant votre service.',
+    );
+    final uri = Uri.parse('https://wa.me/$_whatsAppNumber?text=$message');
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
 
   Widget _highlight(IconData icon, String label) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -130,117 +144,181 @@ class _HomeTab extends StatelessWidget {
         ),
       );
 
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: AppColors.primaryDark,
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: LayoutBuilder(
-            builder: (context, c) {
-              final photoHeight = c.maxHeight * 0.62;
-              return Stack(
-                children: [
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: photoHeight,
-                    child: Image.asset(
-                      _background,
-                      fit: BoxFit.cover,
-                      alignment: Alignment.topCenter,
-                      errorBuilder: (_, __, ___) => const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [AppColors.primary, AppColors.primaryDark],
+  Widget _heroContent(BuildContext context, {required bool desktop}) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
+              _background,
+              fit: BoxFit.cover,
+              alignment: Alignment.centerLeft,
+              errorBuilder: (_, __, ___) => const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.primary, AppColors.primaryDark],
+                  ),
+                ),
+              ),
+            ),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    AppColors.primaryDark.withValues(alpha: .88),
+                    AppColors.primaryDark.withValues(alpha: .64),
+                    AppColors.primaryDark.withValues(alpha: .18),
+                  ],
+                ),
+              ),
+            ),
+            SingleChildScrollView(
+              padding: EdgeInsets.symmetric(
+                horizontal: desktop ? 48 : 24,
+                vertical: desktop ? 42 : 30,
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight - (desktop ? 84 : 60)),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Bonjour 👋', style: TextStyle(color: Colors.white70, fontSize: 17)),
+                    const SizedBox(height: 4),
+                    Text(name, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Vos livraisons,\nsimplement et rapidement.',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: desktop ? 42 : 30,
+                        fontWeight: FontWeight.w800,
+                        height: 1.12,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 620),
+                      child: Text(
+                        'Mon colis, un clin d’œil et c’est livré. Déposez votre demande et suivez votre course depuis votre espace.',
+                        style: TextStyle(color: Colors.white, fontSize: 16, height: 1.5),
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _highlight(Icons.inventory_2_outlined, 'Colis sécurisé'),
+                        _highlight(Icons.bolt, 'Livraison rapide'),
+                        _highlight(Icons.location_on_outlined, 'Suivi en temps réel'),
+                        _highlight(Icons.verified_user_outlined, 'Service de confiance'),
+                      ],
+                    ),
+                    const SizedBox(height: 26),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 520),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: onStart,
+                          icon: const Icon(Icons.local_shipping_outlined),
+                          label: const Text('Faire une demande'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: AppColors.primary,
+                            minimumSize: const Size.fromHeight(54),
+                            textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                           ),
                         ),
                       ),
                     ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _assistanceCard(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFFF7F5FC),
+      padding: const EdgeInsets.all(28),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 330),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const BrandLogo(size: 76),
+              const SizedBox(height: 30),
+              const Icon(Icons.support_agent_rounded, size: 42, color: AppColors.primary),
+              const SizedBox(height: 14),
+              const Text(
+                'Besoin d’assistance ?',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 23, fontWeight: FontWeight.w800, color: AppColors.text),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Contactez-nous directement sur WhatsApp. Notre équipe est à votre écoute pour vous accompagner.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 15, height: 1.5, color: AppColors.muted),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _contactWhatsApp,
+                  icon: const Icon(Icons.chat_bubble_outline),
+                  label: const Text('Contacter sur WhatsApp'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF25D366),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(50),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w700),
                   ),
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: photoHeight,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          stops: const [0, .5, 1],
-                          colors: [
-                            AppColors.primaryDark.withValues(alpha: .15),
-                            AppColors.primaryDark.withValues(alpha: .35),
-                            AppColors.primaryDark,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned.fill(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 28),
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(minHeight: c.maxHeight - 28),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(height: c.maxHeight * 0.36),
-                            const Text('Bonjour 👋', style: TextStyle(color: Colors.white70, fontSize: 16)),
-                            const SizedBox(height: 2),
-                            Text(
-                              name,
-                              style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 14),
-                            const Text(
-                              'Vos livraisons, simplement et rapidement.',
-                              style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800, height: 1.15),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Mon colis, un clin d’œil et c’est livré.',
-                              style: TextStyle(color: Colors.white, fontSize: 15),
-                            ),
-                            const SizedBox(height: 18),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                _highlight(Icons.inventory_2_outlined, 'Colis sécurisé'),
-                                _highlight(Icons.bolt, 'Livraison rapide'),
-                                _highlight(Icons.location_on_outlined, 'Suivi en temps réel'),
-                                _highlight(Icons.verified_user_outlined, 'Service de confiance'),
-                              ],
-                            ),
-                            const SizedBox(height: 22),
-                            FilledButton.icon(
-                              onPressed: onStart,
-                              icon: const Icon(Icons.local_shipping_outlined),
-                              label: const Text('Faire une demande'),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: AppColors.primary,
-                                minimumSize: const Size.fromHeight(52),
-                                textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
+                ),
+              ),
+            ],
           ),
         ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final desktop = width >= 1000;
+    if (desktop) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(flex: 7, child: _heroContent(context, desktop: true)),
+          Expanded(flex: 3, child: _assistanceCard(context)),
+        ],
+      );
+    }
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          SizedBox(
+            height: (MediaQuery.sizeOf(context).height * .68).clamp(460.0, 620.0).toDouble(),
+            child: _heroContent(context, desktop: false),
+          ),
+          _assistanceCard(context),
+        ],
       ),
     );
   }

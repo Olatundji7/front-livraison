@@ -14,11 +14,20 @@ import 'services/push_notification_service.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Préparer l'application sans attendre Firebase.
+  // Firebase doit être prêt avant qu'un utilisateur puisse lancer Google Sign-In.
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    debugPrint('Firebase initialisé avec succès.');
+  } catch (e, stackTrace) {
+    debugPrint('Erreur d’initialisation Firebase : $e');
+    debugPrintStack(stackTrace: stackTrace);
+  }
+
   final api = ApiClient();
   final auth = AuthProvider(api);
 
-  // Afficher immédiatement l'interface Flutter.
   runApp(
     ChangeNotifierProvider<AuthProvider>.value(
       value: auth,
@@ -26,30 +35,21 @@ Future<void> main() async {
     ),
   );
 
-  // Restaurer la session indépendamment de Firebase.
   unawaited(auth.restoreSession());
 
-  // Initialiser Firebase en arrière-plan.
-  unawaited(_initializeFirebase());
+  if (Firebase.apps.isNotEmpty && kIsWeb) {
+    unawaited(_initializeWebPush());
+  }
 }
 
-Future<void> _initializeFirebase() async {
+Future<void> _initializeWebPush() async {
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
+    await PushNotificationService.instance.initialize(
+      vapidKey:
+          'BJWEExh2-UTg4pmZmZSJ9LuKTU4XbMDsnbPQ5EBO9D_Q6fDmbSE7-EqeAmmf-w9cO6IIQUYSbRITKbqwcTV5sxM',
     );
-
-    debugPrint('Firebase initialisé avec succès.');
-
-    // Les notifications push Web restent activées.
-    if (kIsWeb) {
-      await PushNotificationService.instance.initialize(
-        vapidKey:
-            'BJWEExh2-UTg4pmZmZSJ9LuKTU4XbMDsnbPQ5EBO9D_Q6fDmbSE7-EqeAmmf-w9cO6IIQUYSbRITKbqwcTV5sxM',
-      );
-    }
   } catch (e, stackTrace) {
-    debugPrint('Erreur d’initialisation Firebase : $e');
+    debugPrint('Erreur d’initialisation des notifications Web : $e');
     debugPrintStack(stackTrace: stackTrace);
   }
 }

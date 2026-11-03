@@ -5,7 +5,9 @@ import '../core/app_colors.dart';
 
 class BrandLogo extends StatelessWidget {
   final double size;
-  const BrandLogo({super.key, this.size = 48});
+  final double titleSize;
+
+  const BrandLogo({super.key, this.size = 48, this.titleSize = 22});
 
   @override
   Widget build(BuildContext context) {
@@ -13,7 +15,7 @@ class BrandLogo extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           child: Image.asset(
             AppAssets.logo,
             width: size,
@@ -23,27 +25,38 @@ class BrandLogo extends StatelessWidget {
               width: size,
               height: size,
               color: AppColors.primaryLight,
+              alignment: Alignment.center,
               child: const Icon(Icons.delivery_dining, color: AppColors.primary),
             ),
           ),
         ),
         const SizedBox(width: 10),
-        const Flexible(
+        Flexible(
           child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'MA Livraison',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.primaryDark),
-            ),
-            Text(
-              'Rapidité • Fiabilité • Sécurité',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 11, color: AppColors.muted),
-            ),
-          ],
-        ),
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'MA LIVRAISON',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: titleSize,
+                  height: 1.05,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -.35,
+                  color: AppColors.primaryDark,
+                ),
+              ),
+              const SizedBox(height: 3),
+              const Text(
+                'Rapidité • Fiabilité • Sécurité',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11, color: AppColors.muted),
+              ),
+            ],
+          ),
         ),
       ],
     );

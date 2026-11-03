@@ -3,7 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 import '../screens/auth/forgot_password_page.dart';
+import '../screens/auth/register_page.dart';
+import 'google_auth_button.dart';
 import 'brand_logo.dart';
+import 'auth_announcement_bar.dart';
 
 class LoginDialog extends StatefulWidget {
   const LoginDialog({super.key});
@@ -56,7 +59,7 @@ class _LoginDialogState extends State<LoginDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const BrandLogo(size: 52),
+              const BrandLogo(size: 60, titleSize: 23),
               const SizedBox(height: 24),
               const Text(
                 'Connexion',
@@ -77,7 +80,6 @@ class _LoginDialogState extends State<LoginDialog> {
                   prefixIcon: Icon(Icons.phone_outlined),
                 ),
               ),
-              const SizedBox(height: 14),
               const SizedBox(height: 14),
               TextField(
                 controller: password,
@@ -129,6 +131,29 @@ class _LoginDialogState extends State<LoginDialog> {
                       : const Text('Se connecter'),
                 ),
               ),
+              const SizedBox(height: 18),
+              const SizedBox(height: 14),
+              const Text('OU', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              GoogleAuthButton(onSuccess: () {
+                Navigator.of(context).pop();
+              }),
+              const SizedBox(height: 10),
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  const Text('Vous n’avez pas de compte ?'),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RegisterPage()));
+                    },
+                    child: const Text('Créer un compte'),
+                  ),
+                ],
+              ),
+              const AuthAnnouncementBar(),
             ],
           ),
         ),

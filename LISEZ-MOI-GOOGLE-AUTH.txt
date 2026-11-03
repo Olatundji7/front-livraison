@@ -1,0 +1,23 @@
+MA LIVRAISON — CONNEXION GOOGLE + INSCRIPTION CLIENT
+
+Cette archive ne contient que les fichiers à ajouter/remplacer dans le projet Flutter.
+
+INSTALLATION
+1. Extraire cette archive à la racine du projet ~/ma_livraison_flutter (et non dans lib/).
+2. Vérifier que android/app/google-services.json est bien le fichier Firebase téléchargé pour le package com.ma3hsarl.malivraison. Ne pas le remplacer par un ancien fichier.
+3. Depuis la racine du projet : flutter pub get
+4. Puis : flutter clean && flutter run
+
+COMPORTEMENT
+- Téléphone + mot de passe reste disponible et inchangé.
+- Le bouton Google utilise Firebase Authentication puis transmet le Firebase ID token à POST /api/auth/google.
+- Un nouveau compte Google demande le numéro de téléphone puis est créé avec le rôle client par Laravel.
+- Un compte existant associé à la même adresse e-mail vérifiée conserve son rôle (client/livreur/admin).
+- L'accueil public conserve Connexion et Créer un compte, mais n'affiche aucun accès livreur ou administration.
+- La page de connexion affiche « Vous n'avez pas de compte ? Créer un compte ».
+
+PRÉREQUIS API
+La route POST /api/auth/google doit être déployée sur https://ma.ma3hsarl.com, avec la migration firebase_uid exécutée et FIREBASE_WEB_API_KEY renseignée dans le .env du serveur API. La migration doit être exécutée lorsque MySQL est disponible.
+
+NOTE
+Les fichiers Firebase iOS/macOS/Windows ne sont pas configurés dans cette archive. La configuration Android et Web est incluse.

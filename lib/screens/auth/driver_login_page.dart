@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../widgets/auth_announcement_bar.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
@@ -52,6 +54,7 @@ class _DriverLoginPageState extends State<DriverLoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: const AuthAnnouncementBar(),
       appBar: AppBar(title: const Text('Espace livreur')),
       body: Center(
         child: SingleChildScrollView(
@@ -63,7 +66,7 @@ class _DriverLoginPageState extends State<DriverLoginPage> {
                 padding: const EdgeInsets.all(28),
                 child: Column(
                   children: [
-                    const BrandLogo(size: 64),
+                    const BrandLogo(size: 64, titleSize: 24),
                     const SizedBox(height: 20),
                     const Text(
                       'Connexion livreur',

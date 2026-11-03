@@ -1,5 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import '../firebase_options.dart';
 import '../models/user.dart';
 import '../services/api_client.dart';
 import '../services/storage_service.dart';
@@ -12,6 +17,9 @@ class AuthProvider extends ChangeNotifier {
   bool initializing = true;
   bool loading = false;
   String? error;
+  String? _pendingGoogleIdToken;
+  bool googlePhoneRequired = false;
+  static bool _googleInitialized = false;
 
   bool get isAuthenticated => user != null && api.token != null;
   String? get apiToken => api.token;
@@ -61,6 +69,126 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// Authentifie le compte Google avec Firebase, puis fait vérifier le jeton
+  /// côté Laravel. Un nouveau client devra fournir son téléphone.
+  Future<bool> loginWithGoogle() async {
+    loading = true;
+    error = null;
+    googlePhoneRequired = false;
+    _pendingGoogleIdToken = null;
+    notifyListeners();
+    try {
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+      }
+
+      UserCredential credential;
+      if (_isWebPlatform) {
+        credential = await FirebaseAuth.instance.signInWithPopup(
+          GoogleAuthProvider(),
+        );
+      } else {
+        if (!_googleInitialized) {
+          await GoogleSignIn.instance.initialize(
+            serverClientId: '1084690560866-bibstirecrffpeosc7r104q7936por91.apps.googleusercontent.com',
+          );
+          _googleInitialized = true;
+        }
+        final account = await GoogleSignIn.instance.authenticate();
+        final googleAuth = account.authentication;
+        final idToken = googleAuth.idToken;
+        if (idToken == null || idToken.isEmpty) {
+          throw Exception('Google n’a pas fourni de jeton d’identification.');
+        }
+        credential = await FirebaseAuth.instance.signInWithCredential(
+          GoogleAuthProvider.credential(idToken: idToken),
+        );
+      }
+
+      final firebaseUser = credential.user;
+      if (firebaseUser == null) {
+        throw Exception('Impossible de récupérer le compte Google.');
+      }
+      final idToken = await firebaseUser.getIdToken(true);
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception('Le jeton Google est indisponible.');
+      }
+      _pendingGoogleIdToken = idToken;
+      return await _completeGoogleLogin();
+    } catch (e) {
+      error = _googleMessage(e);
+      return false;
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Termine une inscription Google en fournissant le téléphone obligatoire.
+  Future<bool> completeGoogleSignIn({required String telephone}) async {
+    if (_pendingGoogleIdToken == null) {
+      error = 'La session Google a expiré. Recommencez.';
+      notifyListeners();
+      return false;
+    }
+    loading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final ok = await _completeGoogleLogin(phone: telephone.trim());
+      return ok;
+    } catch (e) {
+      error = _message(e, 'Connexion Google impossible.');
+      return false;
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> _completeGoogleLogin({String? phone}) async {
+    try {
+      final data = await api.request('POST', '/auth/google', body: {
+        'id_token': _pendingGoogleIdToken,
+        if (phone != null && phone.isNotEmpty) 'phone': phone,
+      });
+      final rawUser = Map<String, dynamic>.from(data['user'] as Map);
+      api.token = data['token']?.toString();
+      user = UserModel.fromJson(rawUser);
+      await StorageService.saveSession(
+        token: api.token!,
+        userJson: jsonEncode(rawUser),
+      );
+      _pendingGoogleIdToken = null;
+      googlePhoneRequired = false;
+      error = null;
+      return true;
+    } on ApiException catch (e) {
+      final body = e.body is Map ? Map<String, dynamic>.from(e.body as Map) : <String, dynamic>{};
+      if (body['code'] == 'PHONE_REQUIRED') {
+        googlePhoneRequired = true;
+        error = body['message']?.toString() ?? 'Veuillez saisir votre numéro de téléphone.';
+        return false;
+      }
+      rethrow;
+    }
+  }
+
+  String _googleMessage(Object e) {
+    if (e is FirebaseAuthException) {
+      if (e.code == 'popup-closed-by-user' || e.code == 'canceled') {
+        return 'Connexion Google annulée.';
+      }
+      return e.message ?? 'Authentification Google impossible.';
+    }
+    if (e is ApiException) return _message(e, 'Connexion Google impossible.');
+    return e.toString().replaceFirst('Exception: ', '');
+  }
+
+  bool get _isWebPlatform => kIsWeb;
 
   Future<bool> register({
     required String nom,

@@ -13,12 +13,16 @@ import 'screens/client/client_home_page.dart';
 import 'screens/home/home_page.dart';
 import 'screens/splash_page.dart';
 
+final GlobalKey<ScaffoldMessengerState> maLivraisonMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
+
 class MaLivraisonApp extends StatelessWidget {
   const MaLivraisonApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      scaffoldMessengerKey: maLivraisonMessengerKey,
       title: 'MA Livraison',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,

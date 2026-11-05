@@ -30,7 +30,7 @@ class _GoogleSignInButtonState extends State<GoogleSignInButton> {
     if (!ok && auth.googlePhoneRequired) {
       final phone = await _askPhoneNumber();
       if (!mounted || phone == null) return;
-      ok = await auth.loginWithGoogle(telephone: phone);
+      ok = await auth.completeGoogleSignIn(telephone: phone);
     }
 
     if (!mounted) return;

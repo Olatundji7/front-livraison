@@ -21,7 +21,6 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
 
   int _int(Object? value) => value is num ? value.toInt() : int.tryParse('$value') ?? 0;
   double _double(Object? value) => value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
-  String _money(Object? value) => '${_int(value)} FCFA';
 
   @override
   void initState() {
@@ -43,7 +42,7 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
         _loading = false;
       });
     } catch (e) {
-      if (mounted) setState(() { _loading = false; _error = 'Impossible de charger votre profil et vos gains. $e'; });
+      if (mounted) setState(() { _loading = false; _error = 'Impossible de charger votre profil et vos informations. $e'; });
     }
   }
 
@@ -111,7 +110,7 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
                 ),
                 const SizedBox(height: 14),
                 GridView.count(
-                  crossAxisCount: MediaQuery.sizeOf(context).width >= 650 ? 4 : 2,
+                  crossAxisCount: 2,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   crossAxisSpacing: 10,
@@ -119,8 +118,6 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
                   childAspectRatio: 1.35,
                   children: [
                     _stat(Icons.check_circle_outline, 'Courses terminées', '${_int(_stats['completed_count'])}', Colors.green),
-                    _stat(Icons.account_balance_wallet_outlined, 'Gains cumulés', _money(_stats['cumulative_earnings']), AppColors.primary),
-                    _stat(Icons.payments_outlined, 'Gains des courses livrées', _money(_stats['completed_earnings']), Colors.teal),
                     _stat(Icons.route_outlined, 'Distance livrée', '${_double(_stats['total_distance_km']).toStringAsFixed(2)} km', Colors.deepOrange),
                   ],
                 ),
@@ -132,7 +129,6 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
                 else
                   ..._orders.map(_orderCard),
                 const SizedBox(height: 10),
-                const Text('Les gains affichés sont enregistrés à la validation de la commande. La réduction accordée au client ne réduit pas le gain brut du livreur.', style: TextStyle(color: Colors.black54)),
               ]),
             ),
     );
@@ -157,7 +153,6 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
           title: Text('Livraison #${order['id'] ?? '—'}'),
           subtitle: Text('${order['destination_address'] ?? 'Destination non renseignée'}\nDistance : ${_double(order['distance_travelled_km']).toStringAsFixed(2)} km'),
           isThreeLine: true,
-          trailing: Text(_money(order['driver_earnings'] ?? order['gross_delivery_fee']), style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
         ),
       );
 }

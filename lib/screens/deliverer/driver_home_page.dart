@@ -210,10 +210,10 @@ class _DriverHomePageState extends State<DriverHomePage> {
             const SizedBox(height: 4),
             Text(phone, style: const TextStyle(color: Colors.black54)),
             const SizedBox(height: 4),
-            const Text('Profil et gains du livreur', style: TextStyle(color: AppColors.primary)),
+            const Text('Voir mon profil et mes informations', style: TextStyle(color: AppColors.primary)),
           ])),
           IconButton(
-            tooltip: 'Mon profil et mes gains',
+            tooltip: 'Voir mon profil et mes informations',
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DriverDashboardPage())),
             icon: const Icon(Icons.account_circle_outlined),
           ),

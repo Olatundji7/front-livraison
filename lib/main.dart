@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'app.dart';
 import 'firebase_options.dart';
@@ -25,6 +25,10 @@ Future<void> main() async {
     debugPrintStack(stackTrace: stackTrace);
   }
 
+  if (Firebase.apps.isNotEmpty) {
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  }
+
   final api = ApiClient();
   final auth = AuthProvider(api);
 
@@ -35,21 +39,27 @@ Future<void> main() async {
     ),
   );
 
-  unawaited(auth.restoreSession());
-
-  if (Firebase.apps.isNotEmpty && kIsWeb) {
-    unawaited(_initializeWebPush());
-  }
+  unawaited(_restoreAndInitializePush(auth));
 }
 
-Future<void> _initializeWebPush() async {
-  try {
-    await PushNotificationService.instance.initialize(
-      vapidKey:
-          'BJWEExh2-UTg4pmZmZSJ9LuKTU4XbMDsnbPQ5EBO9D_Q6fDmbSE7-EqeAmmf-w9cO6IIQUYSbRITKbqwcTV5sxM',
-    );
-  } catch (e, stackTrace) {
-    debugPrint('Erreur d’initialisation des notifications Web : $e');
-    debugPrintStack(stackTrace: stackTrace);
+Future<void> _restoreAndInitializePush(AuthProvider auth) async {
+  await auth.restoreSession();
+  if (Firebase.apps.isEmpty) return;
+
+  final token = await PushNotificationService.instance.initialize();
+  if (token != null && auth.isAuthenticated) {
+    await auth.syncPushToken(token: token);
   }
+
+  PushNotificationService.instance.onTokenRefresh.listen((newToken) {
+    auth.syncPushToken(token: newToken);
+  });
+
+  FirebaseMessaging.onMessage.listen((message) {
+    final title = message.notification?.title ?? 'MA Livraison';
+    final body = message.notification?.body ?? 'Vous avez une nouvelle notification.';
+    maLivraisonMessengerKey.currentState?.showSnackBar(
+      SnackBar(content: Text('$title — $body'), behavior: SnackBarBehavior.floating),
+    );
+  });
 }

@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../services/push_notification_service.dart';
 import '../firebase_options.dart';
 import '../models/user.dart';
 import '../services/api_client.dart';
@@ -34,6 +35,7 @@ class AuthProvider extends ChangeNotifier {
         final me = await api.request('GET', '/auth/me', authenticated: true);
         user = UserModel.fromJson(Map<String, dynamic>.from(me['user']));
         await StorageService.saveSession(token: token, userJson: jsonEncode(me['user']));
+        await syncPushToken();
       }
     } catch (_) {
       api.token = null;
@@ -58,6 +60,7 @@ class AuthProvider extends ChangeNotifier {
       final rawUser = Map<String, dynamic>.from(data['user'] as Map);
       user = UserModel.fromJson(rawUser);
       await StorageService.saveSession(token: api.token!, userJson: jsonEncode(rawUser));
+      await syncPushToken();
       return true;
     } catch (e) {
       error = e is ApiException
@@ -162,6 +165,7 @@ class AuthProvider extends ChangeNotifier {
         token: api.token!,
         userJson: jsonEncode(rawUser),
       );
+      await syncPushToken();
       _pendingGoogleIdToken = null;
       googlePhoneRequired = false;
       error = null;
@@ -210,6 +214,7 @@ class AuthProvider extends ChangeNotifier {
       final rawUser = Map<String, dynamic>.from(data['user'] as Map);
       user = UserModel.fromJson(rawUser);
       await StorageService.saveSession(token: api.token!, userJson: jsonEncode(rawUser));
+      await syncPushToken();
       return true;
     } catch (e) {
       error = _messageRegister(e);
@@ -275,8 +280,34 @@ class AuthProvider extends ChangeNotifier {
     return 'Serveur injoignable. Vérifiez votre connexion.';
   }
 
+  /// Enregistre le jeton de cet appareil auprès de l’API Laravel.
+  /// Appelée après connexion et restauration de session.
+  Future<void> syncPushToken({String? token}) async {
+    if (!isAuthenticated) return;
+    final fcmToken = token ?? PushNotificationService.instance.currentToken;
+    if (fcmToken == null || fcmToken.isEmpty) return;
+
+    final platform = kIsWeb
+        ? 'web'
+        : (defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android');
+    try {
+      await api.request(
+        'POST',
+        '/fcm-tokens',
+        authenticated: true,
+        body: {'token': fcmToken, 'platform': platform},
+      );
+    } catch (e) {
+      debugPrint('Enregistrement du jeton FCM impossible : $e');
+    }
+  }
+
   Future<void> logout() async {
     try {
+      final fcmToken = PushNotificationService.instance.currentToken;
+      if (api.token != null && fcmToken != null) {
+        await api.request('DELETE', '/fcm-tokens', authenticated: true, body: {'token': fcmToken});
+      }
       if (api.token != null) {
         await api.request('POST', '/auth/logout', authenticated: true);
       }

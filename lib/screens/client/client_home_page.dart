@@ -117,7 +117,7 @@ class _HomeTab extends StatelessWidget {
   static const _background = 'assets/images/team/accueil_client.jpg';
   // Numéro principal affiché sur le support officiel MA Livraison (format international).
   // À confirmer si un autre numéro est dédié au WhatsApp de l'assistance.
-  static const _whatsAppNumber = '2290129300303';
+  static const _whatsAppNumber = '2290194747456';
 
   Future<void> _contactWhatsApp() async {
     final message = Uri.encodeComponent(

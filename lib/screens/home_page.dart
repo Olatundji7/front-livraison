@@ -38,8 +38,10 @@ class _HomePageState extends State<HomePage> {
   int index = 0;
 
   // Numéro de contact affiché sur les supports MA Livraison fournis.
-  static const String _whatsAppNumber = '2290129300303';
-  static const String _mapsQuery = 'MA LIVRAISON Parakou Benin';
+  static const String _whatsAppNumber = '2290194747456';
+  // Coordonnées GPS du point de référence de MA Livraison à Parakou.
+  static const double _locationLatitude = 9.3512777053658;
+  static const double _locationLongitude = 2.6290550914044717;
 
   @override
   void initState() {
@@ -86,7 +88,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _openMaps() async {
     final uri = Uri.parse(
-      'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(_mapsQuery)}',
+      'https://www.google.com/maps/search/?api=1&query=$_locationLatitude,$_locationLongitude',
     );
     if (!await launchUrl(uri, mode: LaunchMode.platformDefault) && mounted) {
       _notice('Impossible d’ouvrir Google Maps.');

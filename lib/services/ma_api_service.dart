@@ -265,8 +265,51 @@ class MaApiService {
         .toList();
   }
 
+  Future<List<Map<String, dynamic>>> advertisementPartners() async {
+    final data = await api.request(
+      'GET',
+      '/admin/advertisement-partners',
+      authenticated: true,
+    );
+    return ((data['partners'] as List?) ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> createAdvertisementPartner({
+    required String name,
+    String? category,
+    String? description,
+    String? phone,
+    String? whatsapp,
+    String? email,
+    String? website,
+    Uint8List? logoBytes,
+    String? logoName,
+  }) async {
+    final data = await api.multipart(
+      'POST',
+      '/admin/advertisement-partners',
+      authenticated: true,
+      fields: {
+        'name': name,
+        'business_category': category ?? '',
+        'description': description ?? '',
+        'contact_phone': phone ?? '',
+        'contact_whatsapp': whatsapp ?? '',
+        'contact_email': email ?? '',
+        'website_url': website ?? '',
+      },
+      fileBytes: logoBytes,
+      fileName: logoName,
+      fileField: 'logo',
+    );
+    return Map<String, dynamic>.from(data['partner'] as Map);
+  }
+
   Future<Map<String, dynamic>> createAdvertisement({
     required String title,
+    required int partnerId,
     String? description,
     bool active = true,
     Uint8List? imageBytes,
@@ -280,8 +323,10 @@ class MaApiService {
       authenticated: true,
       fields: {
         'title': title,
+        'partner_id': partnerId.toString(),
         'description': description ?? '',
         'is_active': active ? '1' : '0',
+        'is_sponsored': '1',
         if (startsAt != null && startsAt.isNotEmpty) 'starts_at': startsAt,
         if (endsAt != null && endsAt.isNotEmpty) 'ends_at': endsAt,
       },
@@ -295,6 +340,7 @@ class MaApiService {
   Future<Map<String, dynamic>> updateAdvertisement({
     required int id,
     required String title,
+    required int partnerId,
     String? description,
     bool active = true,
     Uint8List? imageBytes,
@@ -309,8 +355,10 @@ class MaApiService {
       fields: {
         '_method': 'PUT',
         'title': title,
+        'partner_id': partnerId.toString(),
         'description': description ?? '',
         'is_active': active ? '1' : '0',
+        'is_sponsored': '1',
         if (startsAt != null && startsAt.isNotEmpty) 'starts_at': startsAt,
         if (endsAt != null && endsAt.isNotEmpty) 'ends_at': endsAt,
       },

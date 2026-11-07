@@ -2416,28 +2416,85 @@ class _AdvertisementFormDialogState extends State<_AdvertisementFormDialog> {
   final formKey = GlobalKey<FormState>();
   late final TextEditingController title;
   late final TextEditingController description;
+  late final TextEditingController companyName;
+  late final TextEditingController category;
+  late final TextEditingController companyDescription;
+  late final TextEditingController phone;
+  late final TextEditingController whatsapp;
+  late final TextEditingController email;
+  late final TextEditingController website;
+
+  List<Map<String, dynamic>> partners = [];
+  int? selectedPartnerId;
+  bool createNewPartner = false;
   bool active = true;
+  bool loadingPartners = true;
   Uint8List? imageBytes;
   String? imageName;
+  Uint8List? logoBytes;
+  String? logoName;
 
   @override
   void initState() {
     super.initState();
     final a = widget.advertisement ?? {};
+    final partner = a['partner'] is Map
+        ? Map<String, dynamic>.from(a['partner'] as Map)
+        : <String, dynamic>{};
     title = TextEditingController(text: (a['title'] ?? '').toString());
-    description =
-        TextEditingController(text: (a['description'] ?? '').toString());
+    description = TextEditingController(text: (a['description'] ?? '').toString());
+    companyName = TextEditingController(text: (partner['name'] ?? '').toString());
+    category = TextEditingController(text: (partner['business_category'] ?? '').toString());
+    companyDescription = TextEditingController(text: (partner['description'] ?? '').toString());
+    phone = TextEditingController(text: (partner['contact_phone'] ?? '').toString());
+    whatsapp = TextEditingController(text: (partner['contact_whatsapp'] ?? '').toString());
+    email = TextEditingController(text: (partner['contact_email'] ?? '').toString());
+    website = TextEditingController(text: (partner['website_url'] ?? '').toString());
+    selectedPartnerId = _toInt(a['partner_id'] ?? partner['id']);
     active = a['is_active'] != false;
+    createNewPartner = widget.advertisement == null && selectedPartnerId == null;
+    _loadPartners();
+  }
+
+  Future<void> _loadPartners() async {
+    try {
+      final service = MaApiService(context.read<AuthProvider>().api);
+      final result = await service.advertisementPartners();
+      if (!mounted) return;
+      setState(() {
+        partners = result;
+        if (selectedPartnerId != null &&
+            !partners.any((p) => _toInt(p['id']) == selectedPartnerId)) {
+          selectedPartnerId = null;
+        }
+        loadingPartners = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => loadingPartners = false);
+    }
   }
 
   @override
   void dispose() {
     title.dispose();
     description.dispose();
+    companyName.dispose();
+    category.dispose();
+    companyDescription.dispose();
+    phone.dispose();
+    whatsapp.dispose();
+    email.dispose();
+    website.dispose();
     super.dispose();
   }
 
-  Future<void> pickImage() async {
+  int? _toInt(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return value == null ? null : int.tryParse(value.toString());
+  }
+
+  Future<void> _pickImage({required bool isLogo}) async {
     final file = await ImagePicker().pickImage(
       source: ImageSource.gallery,
       imageQuality: 82,
@@ -2446,18 +2503,52 @@ class _AdvertisementFormDialogState extends State<_AdvertisementFormDialog> {
     final bytes = await file.readAsBytes();
     if (!mounted) return;
     setState(() {
-      imageBytes = bytes;
-      imageName = file.name;
+      if (isLogo) {
+        logoBytes = bytes;
+        logoName = file.name;
+      } else {
+        imageBytes = bytes;
+        imageName = file.name;
+      }
     });
   }
 
   Future<void> submit() async {
     if (!formKey.currentState!.validate()) return;
+    if (!createNewPartner && selectedPartnerId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Choisissez une structure partenaire.')),
+      );
+      return;
+    }
+
     try {
       final service = MaApiService(context.read<AuthProvider>().api);
+      var partnerId = selectedPartnerId;
+
+      if (createNewPartner) {
+        final partner = await service.createAdvertisementPartner(
+          name: companyName.text.trim(),
+          category: category.text.trim(),
+          description: companyDescription.text.trim(),
+          phone: phone.text.trim(),
+          whatsapp: whatsapp.text.trim(),
+          email: email.text.trim(),
+          website: website.text.trim(),
+          logoBytes: logoBytes,
+          logoName: logoName,
+        );
+        partnerId = _toInt(partner['id']);
+      }
+
+      if (partnerId == null) {
+        throw Exception('Impossible de récupérer la structure partenaire.');
+      }
+
       if (widget.advertisement == null) {
         await service.createAdvertisement(
           title: title.text.trim(),
+          partnerId: partnerId,
           description: description.text.trim(),
           active: active,
           imageBytes: imageBytes,
@@ -2467,6 +2558,7 @@ class _AdvertisementFormDialogState extends State<_AdvertisementFormDialog> {
         await service.updateAdvertisement(
           id: _toInt(widget.advertisement!['id'])!,
           title: title.text.trim(),
+          partnerId: partnerId,
           description: description.text.trim(),
           active: active,
           imageBytes: imageBytes,
@@ -2483,80 +2575,139 @@ class _AdvertisementFormDialogState extends State<_AdvertisementFormDialog> {
     }
   }
 
-  int? _toInt(Object? value) {
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    return value == null ? null : int.tryParse(value.toString());
+  Widget _field(TextEditingController controller, String label,
+      {int maxLines = 1, TextInputType? keyboardType, String? Function(String?)? validator}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextFormField(
+        controller: controller,
+        maxLines: maxLines,
+        keyboardType: keyboardType,
+        decoration: InputDecoration(labelText: label),
+        validator: validator,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final api = context.read<AuthProvider>().api;
+    final currentImage = (widget.advertisement?['image_url'] ?? '').toString();
     return AlertDialog(
-      title: Text(
-        widget.advertisement == null
-            ? 'Ajouter une publicité'
-            : 'Modifier la publicité',
-      ),
+      title: Text(widget.advertisement == null
+          ? 'Ajouter une publicité'
+          : 'Modifier la publicité'),
       content: SizedBox(
-        width: 560,
+        width: 580,
         child: Form(
           key: formKey,
           child: SingleChildScrollView(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 if (imageBytes != null)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.memory(imageBytes!,
-                        height: 170, width: double.infinity, fit: BoxFit.cover),
+                    child: Image.memory(imageBytes!, height: 150, fit: BoxFit.cover),
                   )
-                else if ((widget.advertisement?['image_url'] ?? '')
-                    .toString()
-                    .isNotEmpty)
+                else if (currentImage.isNotEmpty)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: Image.network(
-                      context.read<AuthProvider>().api.mediaUrl(
-                          widget.advertisement!['image_url'].toString())!,
-                      height: 170,
-                      width: double.infinity,
+                      api.mediaUrl(currentImage)!,
+                      height: 150,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => const SizedBox(
-                          height: 120,
-                          child: Icon(Icons.broken_image_outlined, size: 50)),
+                        height: 100,
+                        child: Icon(Icons.broken_image_outlined, size: 45),
+                      ),
                     ),
                   ),
-                const SizedBox(height: 10),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: OutlinedButton.icon(
-                    onPressed: pickImage,
+                    onPressed: () => _pickImage(isLogo: false),
                     icon: const Icon(Icons.image_outlined),
-                    label: Text(
-                      imageBytes == null
-                          ? 'Choisir une image'
-                          : 'Image sélectionnée',
-                    ),
+                    label: Text(imageBytes == null
+                        ? 'Choisir la photo publicitaire'
+                        : 'Photo sélectionnée'),
                   ),
                 ),
                 const SizedBox(height: 12),
-                TextFormField(
-                  controller: title,
-                  decoration: const InputDecoration(
-                    labelText: 'Titre de la publicité',
+                const Text('STRUCTURE PARTENAIRE',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                const SizedBox(height: 8),
+                if (loadingPartners)
+                  const LinearProgressIndicator()
+                else
+                  DropdownButtonFormField<int>(
+                    value: createNewPartner ? -1 : selectedPartnerId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Choisir une structure déjà enregistrée',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      const DropdownMenuItem<int>(
+                        value: -1,
+                        child: Text('＋ Enregistrer une nouvelle structure'),
+                      ),
+                      ...partners.map((p) => DropdownMenuItem<int>(
+                        value: _toInt(p['id']),
+                        child: Text((p['name'] ?? 'Structure').toString(),
+                            overflow: TextOverflow.ellipsis),
+                      )),
+                    ],
+                    onChanged: (value) => setState(() {
+                      createNewPartner = value == -1;
+                      selectedPartnerId = value == -1 ? null : value;
+                      if (value != null && value != -1) {
+                        final selected = partners.firstWhere(
+                          (p) => _toInt(p['id']) == value,
+                          orElse: () => {},
+                        );
+                        companyName.text = (selected['name'] ?? '').toString();
+                      }
+                    }),
+                    validator: (v) => v == null ? 'Sélection obligatoire' : null,
                   ),
-                  validator: (v) =>
-                      v == null || v.trim().isEmpty ? 'Obligatoire' : null,
-                ),
-                const SizedBox(height: 10),
-                TextFormField(
-                  controller: description,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
-                    labelText: 'Description',
+                if (createNewPartner) ...[
+                  const SizedBox(height: 14),
+                  const Text('INFORMATIONS DE LA STRUCTURE',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                  _field(companyName, 'Nom de la structure *',
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? 'Le nom de la structure est obligatoire'
+                          : null),
+                  _field(category, 'Domaine d’activité'),
+                  _field(companyDescription, 'Présentation de la structure',
+                      maxLines: 2),
+                  _field(phone, 'Téléphone', keyboardType: TextInputType.phone),
+                  _field(whatsapp, 'WhatsApp', keyboardType: TextInputType.phone),
+                  _field(email, 'Adresse e-mail',
+                      keyboardType: TextInputType.emailAddress),
+                  _field(website, 'Site web'),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _pickImage(isLogo: true),
+                      icon: const Icon(Icons.business),
+                      label: Text(logoBytes == null
+                          ? 'Ajouter le logo de la structure (facultatif)'
+                          : 'Logo sélectionné'),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
+                ],
+                const Divider(height: 24),
+                const Text('CONTENU DE LA PUBLICITÉ',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                _field(title, 'Titre de la publicité *',
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'Le titre est obligatoire'
+                        : null),
+                _field(description, 'Description / informations du produit',
+                    maxLines: 3),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Publicité active'),

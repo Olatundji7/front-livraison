@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../core/app_assets.dart';
 import '../core/app_colors.dart';
 
 /// Écran de démarrage plein écran : logo, slogan et barre de chargement.
@@ -44,76 +43,69 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.white, Color(0xFFE6EEFF)],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              const Spacer(flex: 3),
-              FadeTransition(
-                opacity: _fade,
-                child: ScaleTransition(
-                  scale: _scale,
-                  child: Image.asset(
-                    AppAssets.logo,
-                    width: 230,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Icon(
-                      Icons.delivery_dining,
-                      size: 120,
-                      color: AppColors.primary,
+      body: SizedBox.expand(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
+              'assets/images/ma_livraison_background.png',
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const ColoredBox(
+                color: Color(0xFFE6EEFF),
+                child: Center(
+                  child: Icon(Icons.delivery_dining, size: 100, color: AppColors.primary),
+                ),
+              ),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, Colors.transparent, Colors.black54],
+                ),
+              ),
+            ),
+            SafeArea(
+              child: Column(
+                children: [
+                  const Spacer(),
+                  FadeTransition(
+                    opacity: _fade,
+                    child: ScaleTransition(
+                      scale: _scale,
+                      child: const Text(
+                        'Préparation de votre livraison...',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          shadows: [Shadow(color: Colors.black54, blurRadius: 8)],
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              FadeTransition(
-                opacity: _fade,
-                child: const Text(
-                  'Rapidité • Fiabilité • Sécurité',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: 150,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: const LinearProgressIndicator(
+                        minHeight: 5,
+                        color: Colors.white,
+                        backgroundColor: Colors.white38,
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 35),
+                ],
               ),
-              const Spacer(flex: 2),
-              const Icon(Icons.location_on, size: 46, color: AppColors.primary),
-              const SizedBox(height: 12),
-              const Text(
-                'Vos livraisons, simplement',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 22),
-              SizedBox(
-                width: 150,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: const LinearProgressIndicator(
-                    minHeight: 5,
-                    color: AppColors.primary,
-                    backgroundColor: Color(0xFFD5E0F7),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 40),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

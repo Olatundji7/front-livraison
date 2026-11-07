@@ -76,33 +76,21 @@ class _RegisterPageState extends State<RegisterPage> {
       ),
       body: Stack(
         children: [
-          // Cheval MA Livraison détouré : véritable fond transparent,
-          // indépendant du logo complet utilisé dans l'en-tête.
+          // Même photographie de fond que l'écran d'accueil et la connexion.
           Positioned.fill(
-            child: IgnorePointer(
-              child: Center(
-                child: Opacity(
-                  opacity: .30,
-                  child: Image.asset(
-                    'assets/branding/ma_livraison_cheval.png',
-                    width: 820,
-                    height: 560,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                  ),
-                ),
+            child: Image.asset(
+              'assets/images/ma_livraison_background.png',
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                color: const Color(0xFFE6EEFF),
               ),
             ),
           ),
-          Positioned(
-            top: -100,
-            left: -85,
-            child: _circle(250),
-          ),
-          Positioned(
-            bottom: -100,
-            right: -75,
-            child: _circle(230),
+          // Voile clair : le fond reste visible, le formulaire reste lisible.
+          Positioned.fill(
+            child: Container(
+              color: Colors.white.withValues(alpha: .12),
+            ),
           ),
           Center(
             child: SingleChildScrollView(
@@ -112,7 +100,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: Card(
                   // Transparence légère : le filigrane reste visible derrière
                   // le formulaire sans compromettre le contraste du contenu.
-                  color: Colors.white.withValues(alpha: .70),
+                  color: Colors.white.withValues(alpha: .82),
                   surfaceTintColor: Colors.transparent,
                   elevation: 3,
                   shadowColor: AppColors.primary.withValues(alpha: .10),

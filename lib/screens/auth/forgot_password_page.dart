@@ -119,125 +119,193 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      bottomNavigationBar: const AuthAnnouncementBar(),
-      backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Mot de passe oublié')),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(28),
-                child: Column(
-                  children: [
-                    const BrandLogo(size: 64, titleSize: 24),
-                    const SizedBox(height: 20),
-                    Text(
-                      codeSent ? 'Nouveau mot de passe' : 'Réinitialiser mon mot de passe',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      codeSent
-                          ? 'Saisissez le code reçu par e-mail (valable 15 minutes) et choisissez un nouveau mot de passe.'
-                          : 'Saisissez l’adresse e-mail de votre compte : nous vous envoyons un code de confirmation.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.black54),
-                    ),
-                    const SizedBox(height: 20),
-                    TextField(
-                      controller: email,
-                      enabled: !codeSent,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
-                        labelText: 'Adresse e-mail',
-                        prefixIcon: Icon(Icons.mail_outline),
-                      ),
-                    ),
-                    if (codeSent) ...[
-                      const SizedBox(height: 14),
-                      TextField(
-                        controller: code,
-                        keyboardType: TextInputType.number,
-                        maxLength: 6,
-                        decoration: const InputDecoration(
-                          labelText: 'Code à 6 chiffres',
-                          prefixIcon: Icon(Icons.pin_outlined),
-                          counterText: '',
+  
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    bottomNavigationBar: const AuthAnnouncementBar(),
+    backgroundColor: AppColors.background,
+    appBar: AppBar(
+      title: const Text('Mot de passe oublié'),
+      backgroundColor: Colors.white.withValues(alpha: 0.90),
+      surfaceTintColor: Colors.transparent,
+    ),
+    body: Stack(
+      fit: StackFit.expand,
+      children: [
+        // Fond MA Livraison
+        Image.asset(
+          'assets/images/ma_livraison_background.png',
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            color: const Color(0xFFE6EEFF),
+          ),
+        ),
+
+        // Voile léger pour améliorer la lisibilité
+        Container(
+          color: Colors.white.withValues(alpha: 0.25),
+        ),
+
+        // Formulaire de réinitialisation
+        Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: Card(
+                color: Colors.white.withValues(alpha: 0.90),
+                surfaceTintColor: Colors.transparent,
+                elevation: 8,
+                shadowColor: AppColors.primary.withValues(alpha: 0.18),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(28),
+                  child: Column(
+                    children: [
+                      const BrandLogo(size: 64, titleSize: 24),
+                      const SizedBox(height: 20),
+                      Text(
+                        codeSent
+                            ? 'Nouveau mot de passe'
+                            : 'Réinitialiser mon mot de passe',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 10),
+                      Text(
+                        codeSent
+                            ? 'Saisissez le code reçu par e-mail (valable 15 minutes) et choisissez un nouveau mot de passe.'
+                            : 'Saisissez l’adresse e-mail de votre compte : nous vous envoyons un code de confirmation.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.black54),
+                      ),
+                      const SizedBox(height: 20),
                       TextField(
-                        controller: password,
-                        obscureText: obscure,
-                        decoration: InputDecoration(
-                          labelText: 'Nouveau mot de passe',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            onPressed: () => setState(() => obscure = !obscure),
-                            icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
+                        controller: email,
+                        enabled: !codeSent,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'Adresse e-mail',
+                          prefixIcon: Icon(Icons.mail_outline),
+                        ),
+                      ),
+                      if (codeSent) ...[
+                        const SizedBox(height: 14),
+                        TextField(
+                          controller: code,
+                          keyboardType: TextInputType.number,
+                          maxLength: 6,
+                          decoration: const InputDecoration(
+                            labelText: 'Code à 6 chiffres',
+                            prefixIcon: Icon(Icons.pin_outlined),
+                            counterText: '',
                           ),
                         ),
+                        const SizedBox(height: 14),
+                        TextField(
+                          controller: password,
+                          obscureText: obscure,
+                          decoration: InputDecoration(
+                            labelText: 'Nouveau mot de passe',
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            suffixIcon: IconButton(
+                              onPressed: () =>
+                                  setState(() => obscure = !obscure),
+                              icon: Icon(
+                                obscure
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        TextField(
+                          controller: confirm,
+                          obscureText: obscure,
+                          decoration: const InputDecoration(
+                            labelText: 'Confirmer le mot de passe',
+                            prefixIcon: Icon(Icons.lock_outline),
+                          ),
+                        ),
+                      ],
+                      if (message != null) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          message!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.green),
+                        ),
+                      ],
+                      if (error != null) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: loading
+                              ? null
+                              : (codeSent ? _reset : _send),
+                          child: loading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Text(
+                                  codeSent
+                                      ? 'Modifier le mot de passe'
+                                      : 'Envoyer le code',
+                                ),
+                        ),
                       ),
-                      const SizedBox(height: 14),
-                      TextField(
-                        controller: confirm,
-                        obscureText: obscure,
-                        decoration: const InputDecoration(
-                          labelText: 'Confirmer le mot de passe',
-                          prefixIcon: Icon(Icons.lock_outline),
+                      if (codeSent)
+                        TextButton(
+                          onPressed: loading
+                              ? null
+                              : () => setState(() {
+                                    codeSent = false;
+                                    error = null;
+                                    message = null;
+                                    code.clear();
+                                  }),
+                          child: const Text(
+                            'Renvoyer un code / changer d’adresse',
+                          ),
+                        ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Pas d’adresse e-mail sur votre compte ? Contactez MA Livraison.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.black54,
                         ),
                       ),
                     ],
-                    if (message != null) ...[
-                      const SizedBox(height: 12),
-                      Text(message!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.green)),
-                    ],
-                    if (error != null) ...[
-                      const SizedBox(height: 12),
-                      Text(error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
-                    ],
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: loading ? null : (codeSent ? _reset : _send),
-                        child: loading
-                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                            : Text(codeSent ? 'Modifier le mot de passe' : 'Envoyer le code'),
-                      ),
-                    ),
-                    if (codeSent)
-                      TextButton(
-                        onPressed: loading
-                            ? null
-                            : () => setState(() {
-                                  codeSent = false;
-                                  error = null;
-                                  message = null;
-                                  code.clear();
-                                }),
-                        child: const Text('Renvoyer un code / changer d’adresse'),
-                      ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Pas d’adresse e-mail sur votre compte ? Contactez MA Livraison.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 12, color: Colors.black54),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
         ),
-      ),
-    );
-  }
+      ],
+    ),
+  );
+}
+
 }

@@ -114,7 +114,7 @@ class _HomeTab extends StatelessWidget {
   final String name;
   final VoidCallback onStart;
 
-  static const _background = 'assets/images/team/accueil_client.jpg';
+  static const _background = 'assets/images/ma_livraison_background.png';
   // Numéro principal affiché sur le support officiel MA Livraison (format international).
   // À confirmer si un autre numéro est dédié au WhatsApp de l'assistance.
   static const _whatsAppNumber = '2290194747456';
@@ -170,9 +170,9 @@ class _HomeTab extends StatelessWidget {
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                   colors: [
-                    AppColors.primaryDark.withValues(alpha: .88),
-                    AppColors.primaryDark.withValues(alpha: .64),
-                    AppColors.primaryDark.withValues(alpha: .18),
+                    AppColors.primaryDark.withValues(alpha: .58),
+                    AppColors.primaryDark.withValues(alpha: .32),
+                    AppColors.primaryDark.withValues(alpha: .08),
                   ],
                 ),
               ),

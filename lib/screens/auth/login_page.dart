@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../widgets/auth_announcement_bar.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/app_assets.dart';
 
 import '../../core/app_colors.dart';
 import '../../providers/auth_provider.dart';
@@ -69,30 +68,16 @@ class _LoginPageState extends State<LoginPage> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: IgnorePointer(
-              child: Center(
-                child: Opacity(
-                  opacity: .055,
-                  child: Image.asset(
-                    AppAssets.logo,
-                    width: 360,
-                    height: 280,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                  ),
-                ),
+            child: Image.asset(
+              'assets/images/ma_livraison_background.png',
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const ColoredBox(
+                color: Color(0xFFE6EEFF),
               ),
             ),
           ),
-          Positioned(
-            top: -90,
-            right: -80,
-            child: _decorativeCircle(260),
-          ),
-          Positioned(
-            bottom: -110,
-            left: -80,
-            child: _decorativeCircle(230),
+          Positioned.fill(
+            child: ColoredBox(color: Color(0x14FFFFFF)),
           ),
           Center(
             child: SingleChildScrollView(
@@ -100,6 +85,8 @@ class _LoginPageState extends State<LoginPage> {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 470),
                 child: Card(
+                  color: Colors.white.withValues(alpha: 0.62),
+                  surfaceTintColor: Colors.transparent,
                   elevation: 3,
                   shadowColor: AppColors.primary.withValues(alpha: .10),
                   shape: RoundedRectangleBorder(
@@ -237,7 +224,7 @@ class _LoginPageState extends State<LoginPage> {
                           Navigator.of(context).popUntil((route) => route.isFirst);
                         }),
                         const SizedBox(height: 12),
-                        Center(
+              Center(
                           child: Wrap(
                             alignment: WrapAlignment.center,
                             crossAxisAlignment: WrapCrossAlignment.center,
@@ -264,12 +251,4 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _decorativeCircle(double size) => Container(
-    width: size,
-    height: size,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      color: AppColors.primary.withValues(alpha: .045),
-    ),
-  );
 }

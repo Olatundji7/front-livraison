@@ -203,7 +203,7 @@ class _AdminDashboardState extends State<AdminDashboard>
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Commande #${order.id}'),
+        title: const Text('Détails de la commande'),
         content: SizedBox(
           width: 420,
           child: SingleChildScrollView(
@@ -249,21 +249,23 @@ class _AdminDashboardState extends State<AdminDashboard>
     // Capture le service avant d'ouvrir la boîte de dialogue.
     final service = _serviceForContext(context);
 
-    final productPrice = await showDialog<int>(
+    final approval = await showDialog<Map<String, int>>(
       context: context,
       barrierDismissible: false,
       builder: (_) => _ApproveOrderDialog(order: order, service: service),
     );
 
-    if (!mounted || productPrice == null) return;
+    if (!mounted || approval == null) return;
+
+    final productPrice = approval['product_price']!;
+    final deliveryFee = approval['delivery_fee']!;
 
     try {
-      await service.approveAdminOrder(order.id, productPrice);
+      await service.approveAdminOrder(order.id, productPrice, deliveryFee);
 
       if (!mounted) return;
       _toast(
-        'Commande validée : prix de la commande $productPrice FCFA + frais de livraison '
-        'affichés séparément au client, qui paie le total.',
+        'Commande validée : produit $productPrice FCFA + livraison $deliveryFee FCFA.',
       );
 
       await _loadAll();
@@ -729,8 +731,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                     color: AppColors.primary,
                   ),
                 ),
-                title: Text('Commande #${order.id}'
-                    '${order.clientName == null ? '' : ' · ${order.clientName}'}'),
+                title: Text(order.clientName == null ? 'Commande' : 'Commande · ${order.clientName}'),
                 onTap: () => _showOrderDetails(order),
                 subtitle: Text(
                   '${order.paymentStatus == 'paye' ? 'Payée' : ((order.total ?? 0) > 0 ? 'En attente de paiement' : 'Prix à fixer')}'
@@ -1796,6 +1797,7 @@ class _ApproveOrderDialog extends StatefulWidget {
 class _ApproveOrderDialogState extends State<_ApproveOrderDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _priceController;
+  late final TextEditingController _deliveryFeeController;
   Map<String, dynamic>? _pricing;
   String? _pricingError;
   bool _loadingPricing = true;
@@ -1807,13 +1809,16 @@ class _ApproveOrderDialogState extends State<_ApproveOrderDialog> {
     _priceController = TextEditingController(
       text: price != null && price > 0 ? '$price' : '',
     );
+    _deliveryFeeController = TextEditingController();
     _priceController.addListener(() => setState(() {}));
+    _deliveryFeeController.addListener(() => setState(() {}));
     _loadPricing();
   }
 
   @override
   void dispose() {
     _priceController.dispose();
+    _deliveryFeeController.dispose();
     super.dispose();
   }
 
@@ -1825,7 +1830,10 @@ class _ApproveOrderDialogState extends State<_ApproveOrderDialog> {
     try {
       final data = await widget.service.adminOrderPricing(widget.order.id);
       if (!mounted) return;
-      setState(() => _pricing = data);
+      setState(() {
+        _pricing = data;
+        _deliveryFeeController.text = (data['delivery_fee'] ?? 0).toString();
+      });
     } catch (e) {
       if (!mounted) return;
       final body = e is ApiException ? e.body : null;
@@ -1838,13 +1846,16 @@ class _ApproveOrderDialogState extends State<_ApproveOrderDialog> {
   }
 
   int _num(String key) => (_pricing?[key] as num?)?.toInt() ?? 0;
-  int get _fee => _num('delivery_fee');
+  int get _fee => int.tryParse(_deliveryFeeController.text.trim()) ?? 0;
   int? get _price => int.tryParse(_priceController.text.trim());
 
   void _submit() {
     if (_pricing == null) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    Navigator.of(context).pop<int>(int.parse(_priceController.text.trim()));
+    Navigator.of(context).pop<Map<String, int>>({
+      'product_price': int.parse(_priceController.text.trim()),
+      'delivery_fee': int.parse(_deliveryFeeController.text.trim()),
+    });
   }
 
   Widget _feeBox() {
@@ -1871,7 +1882,26 @@ class _ApproveOrderDialogState extends State<_ApproveOrderDialog> {
               if (_loadingPricing)
                 const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
               else if (_pricing != null)
-                Text('$_fee FCFA', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                SizedBox(
+                  width: 145,
+                  child: TextFormField(
+                    controller: _deliveryFeeController,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.end,
+                    decoration: const InputDecoration(
+                      labelText: 'Frais (FCFA)',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      final amount = int.tryParse((value ?? '').trim());
+                      if (amount == null || amount < 0) {
+                        return 'Montant invalide';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
             ],
           ),
           if (_pricing != null)
@@ -1902,7 +1932,7 @@ class _ApproveOrderDialogState extends State<_ApproveOrderDialog> {
   Widget build(BuildContext context) {
     final price = _price ?? 0;
     return AlertDialog(
-      title: Text('Valider la commande #${widget.order.id}'),
+      title: const Text('Valider la commande'),
       content: Form(
         key: _formKey,
         child: SizedBox(
